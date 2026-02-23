@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary: #ccff00;
+  --color-primary-dark: #b3e600;
+  --color-primary-content: #000000;
+  --color-background-light: #f6f7f8;
+  --color-background-dark: #121920;
+  --color-card-dark: #1a222c;
+  --color-card-light: #ffffff;
+
+  --font-display: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+body {
+  font-family: var(--font-display);
+  background-color: var(--color-background-light);
+  color: #0f172a; /* slate-900 */
+}
+
+.dark body {
+  background-color: var(--color-background-dark);
+  color: #f1f5f9; /* slate-100 */
+}
