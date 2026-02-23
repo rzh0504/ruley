@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import Header from "./components/Header";
 import GenerateCard from "./components/dashboard/GenerateCard";
 import SubscriptionCard from "./components/dashboard/SubscriptionCard";
@@ -6,7 +6,7 @@ import ProxyGroupManager from "./components/dashboard/ProxyGroupManager";
 import ConfigPreview from "./components/dashboard/ConfigPreview";
 import NodeList from "./components/dashboard/NodeList";
 import RuleConfig from "./components/dashboard/RuleConfig";
-import { getDefaultActiveGroups, ProxyGroupTemplate } from "./config/proxyTemplates";
+import { getDefaultActiveGroups, PROXY_GROUP_TEMPLATES, ProxyGroupTemplate } from "./config/proxyTemplates";
 
 // Shared types for the data flow
 export interface RuleItem {
@@ -16,16 +16,56 @@ export interface RuleItem {
   policy: string;
 }
 
+// --- LocalStorage helpers ---
+const STORAGE_KEYS = {
+  proxyGroups: 'ruley_proxyGroups',
+  rules: 'ruley_rules',
+};
+
+function loadProxyGroups(): ProxyGroupTemplate[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEYS.proxyGroups);
+    if (!saved) return getDefaultActiveGroups();
+    const parsed = JSON.parse(saved) as Array<{ id: string } & Partial<ProxyGroupTemplate>>;
+    // Restore full template objects (including ruleSets) and merge user edits
+    return parsed.map(saved => {
+      const template = PROXY_GROUP_TEMPLATES.find(t => t.id === saved.id);
+      if (!template) return null;
+      return { ...template, ...saved, ruleSets: template.ruleSets };
+    }).filter(Boolean) as ProxyGroupTemplate[];
+  } catch {
+    return getDefaultActiveGroups();
+  }
+}
+
+function loadRules(): RuleItem[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEYS.rules);
+    if (!saved) return [];
+    return JSON.parse(saved);
+  } catch {
+    return [];
+  }
+}
+
 export default function App() {
-  // --- Core state lifted to App level ---
+  // --- Core state lifted to App level, persisted via localStorage ---
   const [parsedNodes, setParsedNodes] = useState<any[]>([]);
-  const [proxyGroups, setProxyGroups] = useState<ProxyGroupTemplate[]>(getDefaultActiveGroups());
-  const [rules, setRules] = useState<RuleItem[]>([
-    { id: '1', type: 'DOMAIN-SUFFIX', value: 'google.com', policy: '🚀 节点选择' },
-    { id: '2', type: 'DOMAIN-KEYWORD', value: 'netflix', policy: '🚀 节点选择' },
-  ]);
+  const [proxyGroups, setProxyGroups] = useState<ProxyGroupTemplate[]>(loadProxyGroups);
+  const [rules, setRules] = useState<RuleItem[]>(loadRules);
   const [generatedConfig, setGeneratedConfig] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Auto-save to localStorage on change
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.proxyGroups, JSON.stringify(
+      proxyGroups.map(g => ({ id: g.id, icon: g.icon, name: g.name, type: g.type, desc: g.desc, color: g.color, filter: g.filter }))
+    ));
+  }, [proxyGroups]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.rules, JSON.stringify(rules));
+  }, [rules]);
 
   // --- Generate config handler ---
   const handleGenerate = useCallback(async () => {
@@ -42,6 +82,7 @@ export default function App() {
             name: g.name,
             type: g.type,
             filter: g.filter,
+            ruleSets: g.ruleSets,
           })),
           rules,
         }),

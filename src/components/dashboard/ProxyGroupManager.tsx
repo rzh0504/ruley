@@ -1,35 +1,51 @@
-import React, { useState } from 'react';
-import { PROXY_GROUP_TEMPLATES, getDefaultActiveGroups, ProxyGroupTemplate } from '../../config/proxyTemplates';
+import React, { useState, useMemo } from 'react';
+import { PROXY_GROUP_TEMPLATES, ProxyGroupTemplate } from '../../config/proxyTemplates';
 
-export default function ProxyGroupManager() {
-  const [activeGroups, setActiveGroups] = useState<ProxyGroupTemplate[]>(getDefaultActiveGroups());
+interface ProxyGroupManagerProps {
+  parsedNodes: any[];
+  activeGroups: ProxyGroupTemplate[];
+  onGroupsChange: (groups: ProxyGroupTemplate[]) => void;
+}
+
+export default function ProxyGroupManager({ parsedNodes, activeGroups, onGroupsChange }: ProxyGroupManagerProps) {
   const [selectedGroup, setSelectedGroup] = useState<ProxyGroupTemplate | null>(activeGroups.length > 0 ? activeGroups[0] : null);
   const [isAddingGroup, setIsAddingGroup] = useState(false);
 
-  const toggleGroupActive = (template: ProxyGroupTemplate) => {
-    setActiveGroups(prev => {
-      const isAlreadyActive = prev.some(g => g.id === template.id);
-      if (isAlreadyActive) {
-        // Remove, but don't remove if it's the last one
-        if (prev.length <= 1) return prev;
-        const newGroups = prev.filter(g => g.id !== template.id);
-        if (selectedGroup?.id === template.id) {
-            setSelectedGroup(newGroups[0]);
-        }
-        return newGroups;
-      } else {
-        // Add
-        return [...prev, template].sort((a,b) => parseInt(a.id) - parseInt(b.id)); // Keep sort order roughly consistent
+  // Count matched nodes per group
+  const matchCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const group of activeGroups) {
+      try {
+        const regex = new RegExp(group.filter, 'i');
+        counts[group.id] = parsedNodes.filter(n => n.name && regex.test(n.name)).length;
+      } catch {
+        counts[group.id] = parsedNodes.filter(n => n.name && n.name.toLowerCase().includes(group.filter.toLowerCase())).length;
       }
-    });
+    }
+    return counts;
+  }, [activeGroups, parsedNodes]);
+
+  const toggleGroupActive = (template: ProxyGroupTemplate) => {
+    const isAlreadyActive = activeGroups.some(g => g.id === template.id);
+    if (isAlreadyActive) {
+      if (activeGroups.length <= 1) return;
+      const newGroups = activeGroups.filter(g => g.id !== template.id);
+      if (selectedGroup?.id === template.id) {
+        setSelectedGroup(newGroups[0]);
+      }
+      onGroupsChange(newGroups);
+    } else {
+      const newGroups = [...activeGroups, template].sort((a, b) => parseInt(a.id) - parseInt(b.id));
+      onGroupsChange(newGroups);
+    }
   };
 
   const updateSelectedGroup = (updates: Partial<ProxyGroupTemplate>) => {
-      if(!selectedGroup) return;
-      const updated = { ...selectedGroup, ...updates };
-      setSelectedGroup(updated);
-      setActiveGroups(prev => prev.map(g => g.id === updated.id ? updated : g));
-  }
+    if (!selectedGroup) return;
+    const updated = { ...selectedGroup, ...updates };
+    setSelectedGroup(updated);
+    onGroupsChange(activeGroups.map(g => g.id === updated.id ? updated : g));
+  };
 
   return (
     <div className="rounded-xl bg-white dark:bg-[var(--color-card-dark)] shadow-sm border border-slate-200 dark:border-slate-700 md:col-span-4 lg:col-span-6 xl:col-span-8 row-span-2 flex flex-col relative overflow-hidden h-[600px] md:h-auto md:min-h-[500px]">
