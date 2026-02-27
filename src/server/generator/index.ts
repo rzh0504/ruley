@@ -11,6 +11,7 @@ export interface GroupConfig {
   name: string;
   type: 'select' | 'url-test' | 'fallback';
   filter: string;
+  ruleLinks?: string;
   ruleSets?: [string, boolean][];
 }
 
@@ -114,12 +115,36 @@ export const generateConfig = (req: GenerateRequest): string => {
 
   for (const group of proxyGroups) {
     const fullName = `${group.icon} ${group.name}`;
-    if (!group.ruleSets) continue;
 
-    for (const [providerName, noResolve] of group.ruleSets) {
-      const provider = RULE_PROVIDERS[providerName];
-      if (!provider) continue;
-      usedProviders[providerName] = provider;
+    const ruleLinksStr = group.ruleLinks || '';
+    const urlLines = ruleLinksStr.split('\n').map(l => l.trim()).filter(Boolean);
+    
+    for (const urlStr of urlLines) {
+      let actualUrl = urlStr;
+      let noResolve = false;
+      if (actualUrl.endsWith(',no-resolve')) {
+        actualUrl = actualUrl.replace(',no-resolve', '');
+        noResolve = true;
+      }
+      
+      let behavior = 'domain';
+      if (actualUrl.includes('geoip') || actualUrl.includes('ipcidr')) behavior = 'ipcidr';
+      else if (actualUrl.includes('classical')) behavior = 'classical';
+      else if (actualUrl.includes('geosite')) behavior = 'domain';
+
+      const basename = actualUrl.split('/').pop()?.replace(/\.(yaml|yml|mrs)$/, '') || 'custom';
+      // keep original name if possible so config looks familiar
+      const providerName = basename;
+      
+      usedProviders[providerName] = {
+        type: 'http',
+        behavior,
+        url: actualUrl,
+        path: `./ruleset/${basename}.${actualUrl.endsWith('.mrs') ? 'mrs' : 'yaml'}`,
+        interval: 86400,
+        format: actualUrl.endsWith('.mrs') ? 'mrs' : 'yaml'
+      };
+      
       ruleSetRules.push(`RULE-SET,${providerName},${fullName}${noResolve ? ',no-resolve' : ''}`);
     }
   }

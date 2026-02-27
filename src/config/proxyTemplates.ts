@@ -7,66 +7,79 @@ export interface RuleProviderDef {
   behavior: 'domain' | 'ipcidr';
   url: string;
   path: string;
+  yamlUrl: string;
+  yamlPath: string;
   interval: number;
-  format: string;
+  format: 'mrs' | 'yaml';
 }
 
 const BASE = 'https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo';
 
+const makeProvider = (name: string, behavior: 'domain' | 'ipcidr', subdir: 'geosite' | 'geoip' = 'geosite'): RuleProviderDef => ({
+  type: 'http',
+  behavior,
+  url: `${BASE}/${subdir}/${name}.mrs`,
+  path: `./ruleset/${name}.mrs`,
+  yamlUrl: `${BASE}/${subdir}/${name}.yaml`,
+  yamlPath: `./ruleset/${name}.yaml`,
+  interval: 86400,
+  format: 'mrs', // 默认值
+});
+
 /** All available rule providers from MetaCubeX */
 export const RULE_PROVIDERS: Record<string, RuleProviderDef> = {
-  'category-ads-all': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/category-ads-all.mrs`, path: './ruleset/category-ads-all.mrs', interval: 86400, format: 'mrs' },
-  'category-ai-chat-!cn': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/category-ai-chat-!cn.mrs`, path: './ruleset/category-ai-chat-!cn.mrs', interval: 86400, format: 'mrs' },
-  'openai': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/openai.mrs`, path: './ruleset/openai.mrs', interval: 86400, format: 'mrs' },
-  'anthropic': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/anthropic.mrs`, path: './ruleset/anthropic.mrs', interval: 86400, format: 'mrs' },
-  'youtube': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/youtube.mrs`, path: './ruleset/youtube.mrs', interval: 86400, format: 'mrs' },
-  'google': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/google.mrs`, path: './ruleset/google.mrs', interval: 86400, format: 'mrs' },
-  'google-ip': { type: 'http', behavior: 'ipcidr', url: `${BASE}/geoip/google.mrs`, path: './ruleset/google-ip.mrs', interval: 86400, format: 'mrs' },
-  'microsoft': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/microsoft.mrs`, path: './ruleset/microsoft.mrs', interval: 86400, format: 'mrs' },
-  'onedrive': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/onedrive.mrs`, path: './ruleset/onedrive.mrs', interval: 86400, format: 'mrs' },
-  'apple': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/apple.mrs`, path: './ruleset/apple.mrs', interval: 86400, format: 'mrs' },
-  'icloud': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/icloud.mrs`, path: './ruleset/icloud.mrs', interval: 86400, format: 'mrs' },
-  'telegram': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/telegram.mrs`, path: './ruleset/telegram.mrs', interval: 86400, format: 'mrs' },
-  'telegram-ip': { type: 'http', behavior: 'ipcidr', url: `${BASE}/geoip/telegram.mrs`, path: './ruleset/telegram-ip.mrs', interval: 86400, format: 'mrs' },
-  'twitter': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/twitter.mrs`, path: './ruleset/twitter.mrs', interval: 86400, format: 'mrs' },
-  'twitter-ip': { type: 'http', behavior: 'ipcidr', url: `${BASE}/geoip/twitter.mrs`, path: './ruleset/twitter-ip.mrs', interval: 86400, format: 'mrs' },
-  'facebook': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/facebook.mrs`, path: './ruleset/facebook.mrs', interval: 86400, format: 'mrs' },
-  'instagram': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/instagram.mrs`, path: './ruleset/instagram.mrs', interval: 86400, format: 'mrs' },
-  'whatsapp': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/whatsapp.mrs`, path: './ruleset/whatsapp.mrs', interval: 86400, format: 'mrs' },
-  'facebook-ip': { type: 'http', behavior: 'ipcidr', url: `${BASE}/geoip/facebook.mrs`, path: './ruleset/facebook-ip.mrs', interval: 86400, format: 'mrs' },
-  'steam': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/steam.mrs`, path: './ruleset/steam.mrs', interval: 86400, format: 'mrs' },
-  'epicgames': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/epicgames.mrs`, path: './ruleset/epicgames.mrs', interval: 86400, format: 'mrs' },
-  'ea': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/ea.mrs`, path: './ruleset/ea.mrs', interval: 86400, format: 'mrs' },
-  'ubisoft': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/ubisoft.mrs`, path: './ruleset/ubisoft.mrs', interval: 86400, format: 'mrs' },
-  'blizzard': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/blizzard.mrs`, path: './ruleset/blizzard.mrs', interval: 86400, format: 'mrs' },
-  'gog': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/gog.mrs`, path: './ruleset/gog.mrs', interval: 86400, format: 'mrs' },
-  'riot': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/riot.mrs`, path: './ruleset/riot.mrs', interval: 86400, format: 'mrs' },
-  'github': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/github.mrs`, path: './ruleset/github.mrs', interval: 86400, format: 'mrs' },
-  'gitlab': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/gitlab.mrs`, path: './ruleset/gitlab.mrs', interval: 86400, format: 'mrs' },
-  'atlassian': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/atlassian.mrs`, path: './ruleset/atlassian.mrs', interval: 86400, format: 'mrs' },
-  'aws': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/aws.mrs`, path: './ruleset/aws.mrs', interval: 86400, format: 'mrs' },
-  'azure': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/azure.mrs`, path: './ruleset/azure.mrs', interval: 86400, format: 'mrs' },
-  'cloudflare': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/cloudflare.mrs`, path: './ruleset/cloudflare.mrs', interval: 86400, format: 'mrs' },
-  'digitalocean': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/digitalocean.mrs`, path: './ruleset/digitalocean.mrs', interval: 86400, format: 'mrs' },
-  'vercel': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/vercel.mrs`, path: './ruleset/vercel.mrs', interval: 86400, format: 'mrs' },
-  'netlify': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/netlify.mrs`, path: './ruleset/netlify.mrs', interval: 86400, format: 'mrs' },
-  'cloudflare-ip': { type: 'http', behavior: 'ipcidr', url: `${BASE}/geoip/cloudflare.mrs`, path: './ruleset/cloudflare-ip.mrs', interval: 86400, format: 'mrs' },
-  'docker': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/docker.mrs`, path: './ruleset/docker.mrs', interval: 86400, format: 'mrs' },
-  'npmjs': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/npmjs.mrs`, path: './ruleset/npmjs.mrs', interval: 86400, format: 'mrs' },
-  'jetbrains': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/jetbrains.mrs`, path: './ruleset/jetbrains.mrs', interval: 86400, format: 'mrs' },
-  'stackexchange': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/stackexchange.mrs`, path: './ruleset/stackexchange.mrs', interval: 86400, format: 'mrs' },
-  'dropbox': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/dropbox.mrs`, path: './ruleset/dropbox.mrs', interval: 86400, format: 'mrs' },
-  'notion': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/notion.mrs`, path: './ruleset/notion.mrs', interval: 86400, format: 'mrs' },
-  'paypal': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/paypal.mrs`, path: './ruleset/paypal.mrs', interval: 86400, format: 'mrs' },
-  'stripe': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/stripe.mrs`, path: './ruleset/stripe.mrs', interval: 86400, format: 'mrs' },
-  'wise': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/wise.mrs`, path: './ruleset/wise.mrs', interval: 86400, format: 'mrs' },
-  'binance': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/binance.mrs`, path: './ruleset/binance.mrs', interval: 86400, format: 'mrs' },
-  'private': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/private.mrs`, path: './ruleset/private.mrs', interval: 86400, format: 'mrs' },
-  'private-ip': { type: 'http', behavior: 'ipcidr', url: `${BASE}/geoip/private.mrs`, path: './ruleset/private-ip.mrs', interval: 86400, format: 'mrs' },
-  'geolocation-cn': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/geolocation-cn.mrs`, path: './ruleset/geolocation-cn.mrs', interval: 86400, format: 'mrs' },
-  'cn': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/cn.mrs`, path: './ruleset/cn.mrs', interval: 86400, format: 'mrs' },
-  'cn-ip': { type: 'http', behavior: 'ipcidr', url: `${BASE}/geoip/cn.mrs`, path: './ruleset/cn-ip.mrs', interval: 86400, format: 'mrs' },
-  'geolocation-!cn': { type: 'http', behavior: 'domain', url: `${BASE}/geosite/geolocation-!cn.mrs`, path: './ruleset/geolocation-!cn.mrs', interval: 86400, format: 'mrs' },
+  'category-ads-all': makeProvider('category-ads-all', 'domain'),
+  'category-ai-chat-!cn': makeProvider('category-ai-chat-!cn', 'domain'),
+  'openai': makeProvider('openai', 'domain'),
+  'anthropic': makeProvider('anthropic', 'domain'),
+  'youtube': makeProvider('youtube', 'domain'),
+  'google': makeProvider('google', 'domain'),
+  'google-ip': makeProvider('google', 'ipcidr', 'geoip'),
+  'microsoft': makeProvider('microsoft', 'domain'),
+  'onedrive': makeProvider('onedrive', 'domain'),
+  'apple': makeProvider('apple', 'domain'),
+  'icloud': makeProvider('icloud', 'domain'),
+  'telegram': makeProvider('telegram', 'domain'),
+  'telegram-ip': makeProvider('telegram', 'ipcidr', 'geoip'),
+  'twitter': makeProvider('twitter', 'domain'),
+  'twitter-ip': makeProvider('twitter', 'ipcidr', 'geoip'),
+  'facebook': makeProvider('facebook', 'domain'),
+  'instagram': makeProvider('instagram', 'domain'),
+  'whatsapp': makeProvider('whatsapp', 'domain'),
+  'facebook-ip': makeProvider('facebook', 'ipcidr', 'geoip'),
+  'steam': makeProvider('steam', 'domain'),
+  'epicgames': makeProvider('epicgames', 'domain'),
+  'ea': makeProvider('ea', 'domain'),
+  'ubisoft': makeProvider('ubisoft', 'domain'),
+  'blizzard': makeProvider('blizzard', 'domain'),
+  'gog': makeProvider('gog', 'domain'),
+  'riot': makeProvider('riot', 'domain'),
+  'github': makeProvider('github', 'domain'),
+  'gitlab': makeProvider('gitlab', 'domain'),
+  'atlassian': makeProvider('atlassian', 'domain'),
+  'aws': makeProvider('aws', 'domain'),
+  'azure': makeProvider('azure', 'domain'),
+  'cloudflare': makeProvider('cloudflare', 'domain'),
+  'digitalocean': makeProvider('digitalocean', 'domain'),
+  'vercel': makeProvider('vercel', 'domain'),
+  'netlify': makeProvider('netlify', 'domain'),
+  'cloudflare-ip': makeProvider('cloudflare', 'ipcidr', 'geoip'),
+  'docker': makeProvider('docker', 'domain'),
+  'npmjs': makeProvider('npmjs', 'domain'),
+  'jetbrains': makeProvider('jetbrains', 'domain'),
+  'stackexchange': makeProvider('stackexchange', 'domain'),
+  'dropbox': makeProvider('dropbox', 'domain'),
+  'notion': makeProvider('notion', 'domain'),
+  'paypal': makeProvider('paypal', 'domain'),
+  'stripe': makeProvider('stripe', 'domain'),
+  'wise': makeProvider('wise', 'domain'),
+  'binance': makeProvider('binance', 'domain'),
+  'private': makeProvider('private', 'domain'),
+  'private-ip': makeProvider('private', 'ipcidr', 'geoip'),
+  'geolocation-cn': makeProvider('geolocation-cn', 'domain'),
+  'cn': makeProvider('cn', 'domain'),
+  'cn-ip': makeProvider('cn', 'ipcidr', 'geoip'),
+  'geolocation-!cn': makeProvider('geolocation-!cn', 'domain'),
 };
 
 // ============================================================================
@@ -81,8 +94,19 @@ export interface ProxyGroupTemplate {
   desc: string;
   color: 'blue' | 'purple' | 'green' | 'yellow' | 'red';
   filter: string;
+  /** Primary ruleset URL if the user provides one for this group */
+  ruleLinks?: string;
   /** Rule-set entries: [providerName, noResolve] */
   ruleSets?: [string, boolean][];
+}
+
+export function getDefaultRuleLinks(template: ProxyGroupTemplate): string {
+  if (!template.ruleSets || template.ruleSets.length === 0) return '';
+  return template.ruleSets.map(([name, noResolve]) => {
+    const provider = RULE_PROVIDERS[name];
+    if (!provider) return '';
+    return provider.url + (noResolve ? ',no-resolve' : '');
+  }).filter(Boolean).join('\n');
 }
 
 export const PROXY_GROUP_TEMPLATES: ProxyGroupTemplate[] = [

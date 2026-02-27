@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { PROXY_GROUP_TEMPLATES, ProxyGroupTemplate } from '../../config/proxyTemplates';
+import { PROXY_GROUP_TEMPLATES, ProxyGroupTemplate, getDefaultRuleLinks } from '../../config/proxyTemplates';
 
 interface ProxyGroupManagerProps {
   parsedNodes: any[];
@@ -10,6 +10,48 @@ interface ProxyGroupManagerProps {
 export default function ProxyGroupManager({ parsedNodes, activeGroups, onGroupsChange }: ProxyGroupManagerProps) {
   const [selectedGroup, setSelectedGroup] = useState<ProxyGroupTemplate | null>(activeGroups.length > 0 ? activeGroups[0] : null);
   const [isAddingGroup, setIsAddingGroup] = useState(false);
+  const [unlockedGroups, setUnlockedGroups] = useState<Record<string, boolean>>({});
+
+  const isPreset = selectedGroup ? PROXY_GROUP_TEMPLATES.some(t => t.id === selectedGroup.id) : false;
+  const isUnlocked = selectedGroup ? (!isPreset || unlockedGroups[selectedGroup.id]) : false;
+
+  const COMMON_FILTERS = [
+    { label: '全部', value: '^(.*)$' },
+    { label: '香港', value: '(香港|HK|Hong)' },
+    { label: '台湾', value: '(台湾|TW|Taiwan|新北)' },
+    { label: '新加坡', value: '(新加坡|狮城|SG|Singapore)' },
+    { label: '日本', value: '(日本|川日|东京|大阪|泉日|埼玉|沪日|深日|JP|Japan)' },
+    { label: '美国', value: '(美国|波特兰|达拉斯|俄勒冈|凤凰城|费城|洛杉矶|圣克拉拉|西雅图|芝加哥|US|United States)' },
+    { label: '韩国', value: '(韩国|首尔|KR|Korea)' },
+    { label: '家宽直连', value: '(家电|家宽|ISP|住宅)' },
+    { label: '高优 / 专线', value: '(专线|IPLC|BGP|IEPL|高级|Premium)' },
+    { label: '低倍率', value: '(0\\.\\d|\\b1\\.0\\b|低倍)' },
+  ];
+
+  // Helper function to handle filter button clicks
+  const handleFilterClick = (filterValue: string) => {
+    if (!selectedGroup) return;
+    
+    // If it's a completely exact match with a common filter, and user clicks it, they might want to toggle it off or swap.
+    // For simplicity, clicking a filter directly sets the filter string.
+    let newFilter = selectedGroup.filter;
+    
+    if (filterValue === '^(.*)$') {
+        newFilter = filterValue; // reset to all
+    } else {
+        // If current filter is 'all' or empty, replace it
+        if (!newFilter || newFilter === '^(.*)$' || newFilter === '(REJECT|DIRECT)') {
+            newFilter = filterValue;
+        } else {
+            // Check if current filter is a simple OR group like (HK|SG)
+            // If so, we might want to toggle this region in/out of the group dynamically.
+            // But simple raw regex replacement is safer to just SET the value for this iteration to keep it simple.
+            newFilter = filterValue; 
+        }
+    }
+    
+    updateSelectedGroup({ filter: newFilter });
+  };
 
   // Count matched nodes per group
   const matchCounts = useMemo(() => {
@@ -58,14 +100,14 @@ export default function ProxyGroupManager({ parsedNodes, activeGroups, onGroupsC
           <p className="text-xs text-slate-500 mt-0.5">配置策略组与节点筛选规则。</p>
         </div>
         <div className="flex gap-2">
-          <button className="hidden md:flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 transition-colors cursor-pointer">
-            <span className="material-symbols-outlined text-[16px]">content_copy</span> 复制组
-          </button>
           <button 
-            onClick={() => setIsAddingGroup(true)}
+            onClick={() => setIsAddingGroup(!isAddingGroup)}
             className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] text-black text-xs font-bold transition-colors shadow-lg shadow-[var(--color-primary)]/20 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[18px]">add</span> {isAddingGroup ? '完成选择' : '预设中添加'}
+            <span className="material-symbols-outlined text-[18px]">
+                {isAddingGroup ? 'done' : 'add'}
+            </span> 
+            {isAddingGroup ? '完成选择' : '预设中添加'}
           </button>
         </div>
       </div>
@@ -101,8 +143,8 @@ export default function ProxyGroupManager({ parsedNodes, activeGroups, onGroupsC
                     {group.type}
                   </span>
                 </div>
-                <div className={`text-xs truncate ${selectedGroup?.id === group.id ? 'text-slate-500' : 'text-slate-400'}`}>
-                  {group.desc}
+                <div className={`text-xs truncate ${selectedGroup?.id === group.id ? 'text-slate-500' : 'text-slate-400'}`} title={group.ruleLinks || '无配置'}>
+                  {group.ruleLinks ? group.ruleLinks.split('\n')[0] + (group.ruleLinks.includes('\n') ? ' ...' : '') : '无外接规则'}
                 </div>
                 {selectedGroup?.id === group.id && (
                   <div className="absolute left-0 top-2 bottom-2 w-1 bg-[var(--color-primary)] rounded-r"></div>
@@ -194,7 +236,7 @@ export default function ProxyGroupManager({ parsedNodes, activeGroups, onGroupsC
                 </div>
                 <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1.5">策略类型</label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-2 mb-4">
                     {['select', 'url-test', 'fallback'].map((type) => (
                     <label key={type} className="cursor-pointer">
                         <input
@@ -215,43 +257,105 @@ export default function ProxyGroupManager({ parsedNodes, activeGroups, onGroupsC
                     ))}
                 </div>
                 </div>
-                <div className="flex-2 flex flex-col min-h-0 mb-4">
-                <div className="flex justify-between items-center mb-1.5">
-                    <label className="block text-xs font-bold text-slate-500">组说明</label>
-                </div>
-                <textarea
-                    key={`desc-${selectedGroup.id}`}
-                    className="w-full bg-slate-50 dark:bg-[#0f151b] border border-slate-200 dark:border-slate-700 rounded p-3 text-sm text-slate-900 dark:text-white focus:ring-1 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none h-16 resize-none"
-                    defaultValue={selectedGroup.desc}
-                    onChange={(e) => updateSelectedGroup({desc: e.target.value})}
-                    placeholder="该策略组的作用说明..."
-                ></textarea>
-                </div>
+
+                {(() => {
+                  const hasRules = isPreset ? !!getDefaultRuleLinks(selectedGroup) : true;
+                  
+                  if (!hasRules && !selectedGroup.ruleLinks) {
+                     return (
+                        <div className="flex-1 flex flex-col min-h-0 mb-4 h-32">
+                           <div className="flex justify-between items-center mb-1.5">
+                               <label className="block text-xs font-bold text-slate-500">组说明</label>
+                           </div>
+                           <div className="w-full bg-slate-50 dark:bg-[#0f151b] border border-slate-200 dark:border-slate-700 rounded p-3 text-xs text-slate-500 dark:text-slate-400 flex-1 flex items-center justify-center italic">
+                              {selectedGroup.desc || '该基础策略组不绑定外部规则'}
+                           </div>
+                        </div>
+                     );
+                  }
+
+                  return (
+                    <div className="flex-1 flex flex-col min-h-0 mb-4 h-32">
+                      <div className="flex justify-between items-center mb-1.5">
+                          <div className="flex items-center gap-2">
+                              <label className="block text-xs font-bold text-slate-500">外部规则链接 (YAML/MRS)</label>
+                              {isPreset && !isUnlocked && (
+                                <button 
+                                  onClick={() => setUnlockedGroups(prev => ({...prev, [selectedGroup.id]: true}))}
+                                  className="flex items-center gap-1 text-[10px] bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-300 transition-colors"
+                                  title="解锁后本次会话可编辑"
+                                >
+                                  <span className="material-symbols-outlined text-[12px]">lock</span>
+                                  <span>解锁编辑</span>
+                                </button>
+                              )}
+                              {isPreset && isUnlocked && (
+                                <span className="text-[10px] text-orange-500 bg-orange-50 dark:bg-orange-900/20 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-[12px] animate-pulse">new_releases</span>
+                                  当前修改仅本次有效
+                                </span>
+                              )}
+                          </div>
+                          <div className="text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded cursor-help" title="如需不解析ip，可在链接后加上 ,no-resolve">每行输入一条合法的规则链接</div>
+                      </div>
+                      <textarea
+                          key={`rule-links-${selectedGroup.id}`}
+                          className={`w-full bg-slate-50 dark:bg-[#0f151b] border border-slate-200 dark:border-slate-700 rounded p-3 text-xs text-slate-900 dark:text-white focus:ring-1 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none resize-none font-mono flex-1 leading-relaxed whitespace-pre-wrap word-break-all ${!isUnlocked ? 'opacity-70 cursor-not-allowed bg-slate-100 dark:bg-[#0a0e12]' : ''}`}
+                          value={selectedGroup.ruleLinks !== undefined ? selectedGroup.ruleLinks : getDefaultRuleLinks(selectedGroup)}
+                          readOnly={!isUnlocked}
+                          onChange={(e) => updateSelectedGroup({ruleLinks: e.target.value})}
+                          placeholder="https://.../rules.yaml&#10;https://.../rules.mrs,no-resolve"
+                      />
+                    </div>
+                  );
+                })()}
                 
-                <div className="flex-1 flex flex-col min-h-0">
-                <div className="flex justify-between items-center mb-1.5">
-                    <label className="block text-xs font-bold text-slate-500">使用正则/关键词匹配节点</label>
-                    <div className="text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded cursor-help">匹配包含该字符串或符合正则的节点</div>
-                </div>
-                <div className="relative mb-2">
-                    <span className="absolute left-3 top-2.5 text-slate-400 font-mono text-sm opacity-50">
-                    /
-                    </span>
-                    <input
-                    key={`filter-${selectedGroup.id}`}
-                    className="w-full bg-slate-50 dark:bg-[#0f151b] border border-slate-200 dark:border-slate-700 rounded h-10 pl-7 pr-7 text-sm text-slate-900 dark:text-white focus:ring-1 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] font-mono outline-none"
-                    placeholder="(HK|SG|US|JP)"
-                    type="text"
-                    defaultValue={selectedGroup.filter}
-                    onChange={(e) => updateSelectedGroup({filter: e.target.value})}
-                    />
-                    <span className="absolute right-3 top-2.5 text-slate-400 font-mono text-sm opacity-50">
-                    /
-                    </span>
-                </div>
-                <p className="text-xs text-slate-400 leading-snug">
-                    当前策略会最终生成在 <code>{selectedGroup.name}</code> 配置块下。如果匹配到真实节点，该策略组将自动包含这些节点。在提交最终配置需求时，前端将其作为 JSON Schema 发送给控制层。
-                </p>
+                <div className="flex-1 flex flex-col min-h-0 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                  <div className="flex justify-between items-center mb-2">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">快速节点匹配</label>
+                      <div className="text-[10px] text-slate-400 bg-white dark:bg-slate-800 px-2 py-0.5 rounded shadow-sm border border-slate-200 dark:border-slate-700">点击以下标签快速筛选地域</div>
+                  </div>
+                  
+                  {/* Quick Filter Buttons */}
+                  <div className="flex flex-wrap gap-2 mb-3">
+                      {COMMON_FILTERS.map(filter => {
+                          // Simple check if this filter is active
+                          const isActive = selectedGroup.filter === filter.value;
+                          return (
+                              <button
+                                  key={filter.label}
+                                  onClick={() => handleFilterClick(filter.value)}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                                      isActive 
+                                      ? 'bg-[var(--color-primary)] text-black border-[var(--color-primary)] shadow-md shadow-[var(--color-primary)]/20 scale-105' 
+                                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                  }`}
+                              >
+                                  {filter.label}
+                              </button>
+                          );
+                      })}
+                  </div>
+
+                  {/* Advanced Regex Input */}
+                  <div className="mt-auto">
+                    <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">进阶正则匹配 (Advanced)</label>
+                    <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-slate-400 font-mono text-sm opacity-50">/</span>
+                        <input
+                            key={`filter-${selectedGroup.id}`}
+                            className="w-full bg-white dark:bg-[#0f151b] border border-slate-200 dark:border-slate-700 rounded h-10 pl-7 pr-7 text-sm text-slate-900 dark:text-white focus:ring-1 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] font-mono outline-none shadow-sm"
+                            placeholder="^(HK|SG|US|JP)$"
+                            type="text"
+                            value={selectedGroup.filter}
+                            onChange={(e) => updateSelectedGroup({filter: e.target.value})}
+                        />
+                        <span className="absolute right-3 top-2.5 text-slate-400 font-mono text-sm opacity-50">/</span>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-snug mt-2">
+                      当前策略组将自动包含所有匹配上述条件的真实节点。
+                  </p>
                 </div>
             </div>
           ) : (

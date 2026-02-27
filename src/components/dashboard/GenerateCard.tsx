@@ -8,7 +8,9 @@ interface GenerateCardProps {
   nodesCount: number;
 }
 
-export default function GenerateCard({ onGenerate, onDownload, isGenerating, hasConfig, nodesCount }: GenerateCardProps) {
+export default function GenerateCard({
+  onGenerate, onDownload, isGenerating, hasConfig, nodesCount
+}: GenerateCardProps) {
   return (
     <div className="group relative overflow-hidden rounded-xl bg-white dark:bg-[var(--color-card-dark)] shadow-sm border border-slate-200 dark:border-slate-700 md:col-span-1 lg:col-span-2 xl:col-span-3 row-span-2 flex flex-col p-5">
       <div className="flex items-start justify-between mb-4">
@@ -19,6 +21,7 @@ export default function GenerateCard({ onGenerate, onDownload, isGenerating, has
       </div>
       <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">一键生成</h3>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">编译当前配置并推送更新至客户端。</p>
+
       {nodesCount > 0 && (
         <p className="text-xs text-[var(--color-primary)] font-bold mb-4">
           <span className="material-symbols-outlined text-[14px] align-middle mr-1">check_circle</span>

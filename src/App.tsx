@@ -6,7 +6,7 @@ import ProxyGroupManager from "./components/dashboard/ProxyGroupManager";
 import ConfigPreview from "./components/dashboard/ConfigPreview";
 import NodeList from "./components/dashboard/NodeList";
 import RuleConfig from "./components/dashboard/RuleConfig";
-import { getDefaultActiveGroups, PROXY_GROUP_TEMPLATES, ProxyGroupTemplate } from "./config/proxyTemplates";
+import { PROXY_GROUP_TEMPLATES, ProxyGroupTemplate, getDefaultRuleLinks } from './config/proxyTemplates';
 
 // Shared types for the data flow
 export interface RuleItem {
@@ -22,6 +22,13 @@ const STORAGE_KEYS = {
   rules: 'ruley_rules',
 };
 
+function getDefaultActiveGroups(): ProxyGroupTemplate[] {
+  return PROXY_GROUP_TEMPLATES.map(t => ({
+    ...t,
+    ruleLinks: getDefaultRuleLinks(t)
+  }));
+}
+
 function loadProxyGroups(): ProxyGroupTemplate[] {
   try {
     const saved = localStorage.getItem(STORAGE_KEYS.proxyGroups);
@@ -30,8 +37,20 @@ function loadProxyGroups(): ProxyGroupTemplate[] {
     // Restore full template objects (including ruleSets) and merge user edits
     return parsed.map(saved => {
       const template = PROXY_GROUP_TEMPLATES.find(t => t.id === saved.id);
-      if (!template) return null;
-      return { ...template, ...saved, ruleSets: template.ruleSets };
+      if (!template) {
+        // If it's a custom group (future support), load saved ruleLinks normally
+        return {
+           ...saved,
+           ruleSets: saved.ruleSets || []
+        } as ProxyGroupTemplate; 
+      }
+      return { 
+        ...template, 
+        ...saved, 
+        ruleSets: template.ruleSets, 
+        // Force reset preset groups to default ruleLinks on EVERY load (session only edits)
+        ruleLinks: getDefaultRuleLinks(template)
+      };
     }).filter(Boolean) as ProxyGroupTemplate[];
   } catch {
     return getDefaultActiveGroups();
@@ -56,10 +75,12 @@ export default function App() {
   const [generatedConfig, setGeneratedConfig] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Auto-save to localStorage on change
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.proxyGroups, JSON.stringify(
-      proxyGroups.map(g => ({ id: g.id, icon: g.icon, name: g.name, type: g.type, desc: g.desc, color: g.color, filter: g.filter }))
+      proxyGroups.map(g => ({
+        id: g.id, icon: g.icon, name: g.name, type: g.type, color: g.color, filter: g.filter,
+        ruleLinks: g.ruleLinks
+      }))
     ));
   }, [proxyGroups]);
 
@@ -80,9 +101,8 @@ export default function App() {
             id: g.id,
             icon: g.icon,
             name: g.name,
-            type: g.type,
-            filter: g.filter,
             ruleSets: g.ruleSets,
+            ruleLinks: g.ruleLinks,
           })),
           rules,
         }),
