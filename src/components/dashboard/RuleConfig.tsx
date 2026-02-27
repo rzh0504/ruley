@@ -62,7 +62,7 @@ export default function RuleConfig({ rules, onRulesChange, policyOptions }: Rule
   ];
 
   return (
-    <div className="rounded-xl bg-white dark:bg-[var(--color-card-dark)] shadow-sm border border-slate-200 dark:border-slate-700 md:col-span-4 lg:col-span-12 xl:col-span-12 p-5 flex flex-col md:flex-row gap-6">
+    <div className="rounded-xl bg-white dark:bg-[var(--color-card-dark)] shadow-sm border border-slate-200 dark:border-slate-700 md:col-span-4 lg:col-span-12 xl:col-span-12 p-5 flex flex-col md:flex-row gap-6 relative">
       <div className="flex-1">
         <h3 className="font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
           <span className="material-symbols-outlined text-slate-400">rule</span> 规则配置

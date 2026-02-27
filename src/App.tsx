@@ -140,7 +140,7 @@ export default function App() {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col overflow-x-hidden bg-[var(--color-background-light)] dark:bg-[var(--color-background-dark)] text-slate-900 dark:text-slate-100 font-display">
+    <div className="min-h-screen flex flex-col bg-[var(--color-background-light)] dark:bg-[var(--color-background-dark)] text-slate-900 dark:text-slate-100 font-display">
       <Header />
       <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto w-full">
         <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
