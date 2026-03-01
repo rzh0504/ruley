@@ -90,7 +90,7 @@ export default function ProxyGroupManager({ parsedNodes, activeGroups, onGroupsC
   };
 
   return (
-    <div className="rounded-xl bg-white dark:bg-[var(--color-card-dark)] shadow-sm border border-slate-200 dark:border-slate-700 md:col-span-4 lg:col-span-6 xl:col-span-8 row-span-2 flex flex-col relative overflow-hidden h-[600px] md:h-auto md:min-h-[500px]">
+    <div className="rounded-xl bg-white dark:bg-[var(--color-card-dark)] shadow-sm border border-slate-200 dark:border-slate-700 md:col-span-4 lg:col-span-6 xl:col-span-8 row-span-2 flex flex-col relative overflow-hidden max-h-[600px]">
       <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/30">
         <div>
           <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">

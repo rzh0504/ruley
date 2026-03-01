@@ -25,12 +25,12 @@ export const decodeBase64 = (str: string): string => {
  * Heuristic: check if a string looks like Base64-encoded data.
  */
 const isLikelyBase64 = (str: string): boolean => {
-  const trimmed = str.trim();
+  const trimmed = str.replace(/[\s\r\n\uFEFF]/g, ''); // Strip all whitespace and BOM
   if (trimmed.length < 20) return false;
-  // Must only contain Base64 chars (including URL-safe and whitespace)
-  if (!/^[A-Za-z0-9+/=_\-\s]+$/.test(trimmed)) return false;
+  // Must only contain Base64 chars
+  if (!/^[A-Za-z0-9+/=_\-]+$/.test(trimmed)) return false;
   // Should not look like a URL or YAML
-  if (trimmed.includes('://') || trimmed.includes('proxies:')) return false;
+  if (str.includes('://') || str.includes('proxies:')) return false;
   return true;
 };
 
@@ -639,14 +639,10 @@ export const fetchAndParseSubscription = async (url: string): Promise<any[]> => 
       'User-Agent': 'ClashforWindows/0.20.39',
     },
     timeout: 15000,
-    responseType: 'text',
-    // Some servers return odd content types; always treat as text
-    transformResponse: [(data: any) => data],
+    responseType: 'arraybuffer',
   });
 
-  let rawData: string = typeof response.data === 'string'
-    ? response.data
-    : String(response.data);
+  let rawData: string = Buffer.from(response.data).toString('utf-8');
 
   return parseRawContent(rawData);
 };
@@ -732,8 +728,9 @@ export const parseInput = async (rawInput: string): Promise<{ proxies: any[], er
   }
 
   // --- Strategy 2: Try the whole input as Base64 ---
+  // Users might paste base64 spanning multiple lines string in textarea
   if (isLikelyBase64(trimmed)) {
-    const decoded = decodeBase64(trimmed);
+    const decoded = decodeBase64(trimmed.replace(/[\s\r\n\uFEFF]/g, ''));
     if (decoded) {
       const yamlFromB64 = tryParseYaml(decoded);
       if (yamlFromB64 && yamlFromB64.length > 0) {
@@ -774,13 +771,21 @@ export const parseInput = async (rawInput: string): Promise<{ proxies: any[], er
     }
   }
 
-  // Fetch and parse HTTP subscription URLs
-  for (const url of httpUrls) {
-    try {
-      const proxies = await fetchAndParseSubscription(url);
-      allProxies.push(...proxies);
-    } catch (err: any) {
-      errors.push({ url, error: err.message });
+  // Fetch and parse HTTP subscription URLs concurrently
+  const httpResults = await Promise.allSettled(
+    httpUrls.map(url => fetchAndParseSubscription(url).then(proxies => ({ url, proxies })))
+  );
+
+  for (const result of httpResults) {
+    if (result.status === 'fulfilled') {
+      if (result.value.proxies.length === 0) {
+        errors.push({ url: result.value.url, error: '成功连接到链接，但在内容中未能解析出任何有效节点，可能是源站返回了防盗链或非节点页面。' });
+      } else {
+        allProxies.push(...result.value.proxies);
+      }
+    } else {
+      const url = httpUrls[httpResults.indexOf(result)];
+      errors.push({ url, error: result.reason?.message || 'Unknown error' });
     }
   }
 
@@ -791,5 +796,14 @@ export const parseInput = async (rawInput: string): Promise<{ proxies: any[], er
     }
   }
 
-  return { proxies: allProxies, errors };
+  // Deduplicate proxies by server+port+type
+  const seen = new Set<string>();
+  const dedupedProxies = allProxies.filter(p => {
+    const key = `${p.server}:${p.port}:${p.type}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return { proxies: dedupedProxies, errors };
 };

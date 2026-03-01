@@ -4,7 +4,7 @@ import React from 'react';
 
 export default function NodeList({ nodes = [] }: { nodes?: any[] }) {
   return (
-    <div className="rounded-xl bg-white dark:bg-[var(--color-card-dark)] shadow-sm border border-slate-200 dark:border-slate-700 md:col-span-4 lg:col-span-6 xl:col-span-4 row-span-2 flex flex-col overflow-hidden max-h-[420px]">
+    <div className="rounded-xl bg-white dark:bg-[var(--color-card-dark)] shadow-sm border border-slate-200 dark:border-slate-700 md:col-span-4 lg:col-span-6 xl:col-span-4 row-span-2 flex flex-col overflow-hidden max-h-[480px]">
       <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800">
         <h3 className="font-bold text-slate-900 dark:text-white text-sm">活跃节点列表</h3>
         <div className="flex gap-2">

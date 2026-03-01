@@ -14,7 +14,7 @@ export default function Footer() {
           支持
         </a>
       </div>
-      <p>© 2024 SubBoost Pro. 保留所有权利。</p>
+      <p>© 2025 Ruley. 保留所有权利。</p>
     </footer>
   );
 }

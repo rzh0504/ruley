@@ -24,3 +24,38 @@ body {
   background-color: var(--color-background-dark);
   color: #f1f5f9; /* slate-100 */
 }
+
+/* Styled scrollbar for card content areas */
+.styled-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.styled-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.styled-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 9999px;
+}
+
+.styled-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;
+}
+
+.dark .styled-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #334155;
+}
+
+.dark .styled-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #475569;
+}
+
+.styled-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.dark .styled-scrollbar {
+  scrollbar-color: #334155 transparent;
+}

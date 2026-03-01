@@ -26,6 +26,7 @@ export interface GenerateRequest {
   proxies: any[];
   proxyGroups: GroupConfig[];
   rules: RuleItem[];
+  platform?: 'clash' | 'mihomo';
   settings?: {
     port?: number;
     socksPort?: number;
@@ -33,6 +34,7 @@ export interface GenerateRequest {
     mode?: string;
     logLevel?: string;
     externalController?: string;
+    advancedDns?: boolean;
   };
 }
 
@@ -52,12 +54,18 @@ const matchProxies = (proxies: any[], filter: string): string[] => {
 };
 
 export const generateConfig = (req: GenerateRequest): string => {
-  const { proxies = [], proxyGroups = [], rules = [], settings = {} } = req;
+  const { proxies: rawProxies = [], proxyGroups = [], rules = [], settings = {}, platform = 'clash' } = req;
 
   const {
     port = 7897, allowLan = true, mode = 'rule', logLevel = 'info',
-    externalController = '127.0.0.1:9090',
+    externalController = '127.0.0.1:9090', advancedDns = false
   } = settings;
+
+  // Filter proxies based on platform
+  // Clash Premium does not support vless, hysteria, hysteria2, tuic etc. natively.
+  const proxies = platform === 'mihomo' 
+    ? rawProxies 
+    : rawProxies.filter(p => !['vless', 'hysteria', 'hysteria2', 'tuic', 'wireguard'].includes(p.type));
 
   // --- Build proxy-groups ---
   const clashProxyGroups: any[] = [];
@@ -175,13 +183,17 @@ export const generateConfig = (req: GenerateRequest): string => {
     'tcp-concurrent': true,
     'find-process-mode': 'strict',
     'external-controller': externalController,
-    dns: {
+    dns: advancedDns ? {
       enable: true, listen: '127.0.0.1:5335', 'enhanced-mode': 'fake-ip',
       'fake-ip-range': '198.18.0.1/16',
-      'default-nameserver': ['180.76.76.76', '182.254.118.118', '8.8.8.8'],
-      nameserver: ['180.76.76.76', '119.29.29.29', '223.5.5.5', '8.8.8.8', 'https://dns.alidns.com/dns-query', 'https://doh.pub/dns-query'],
-      fallback: ['https://dns.alidns.com/dns-query', 'https://doh.pub/dns-query', 'https://cloudflare-dns.com/dns-query', 'https://dns.google/dns-query'],
-      'fallback-filter': { geoip: true, ipcidr: ['240.0.0.0/4', '0.0.0.0/32'], domain: ['+.google.com', '+.facebook.com', '+.twitter.com', '+.youtube.com'] },
+      'default-nameserver': ['114.114.114.114', '223.5.5.5', '8.8.8.8', '1.1.1.1'],
+      nameserver: ['https://dns.alidns.com/dns-query', 'https://doh.pub/dns-query', '114.114.114.114', '223.5.5.5'],
+      fallback: ['https://cloudflare-dns.com/dns-query', 'https://dns.google/dns-query', 'tls://8.8.8.8:853'],
+      'fallback-filter': { geoip: true, geoipcode: 'CN', ipcidr: ['240.0.0.0/4', '0.0.0.0/32'], domain: ['+.google.com', '+.facebook.com', '+.twitter.com', '+.youtube.com'] },
+    } : {
+      enable: true, listen: '127.0.0.1:5335', 'enhanced-mode': 'fake-ip',
+      'fake-ip-range': '198.18.0.1/16',
+      nameserver: ['114.114.114.114', '223.5.5.5', '8.8.8.8', '1.1.1.1']
     },
     profile: { 'store-selected': true, 'store-fake-ip': false },
     sniffer: {
@@ -197,6 +209,15 @@ export const generateConfig = (req: GenerateRequest): string => {
     proxies,
     'proxy-groups': clashProxyGroups,
   };
+
+  // If using generic Clash, maybe remove some mihomo-specific features to avoid warnings
+  if (platform === 'clash') {
+      delete config['geodata-mode'];
+      delete config['geodata-loader'];
+      delete config['geox-url'];
+      delete config['geo-auto-update'];
+      delete config['geo-update-interval'];
+  }
 
   if (Object.keys(usedProviders).length > 0) {
     config['rule-providers'] = usedProviders;
