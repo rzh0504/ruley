@@ -19,6 +19,7 @@ export default function ProxyGroupManager({ parsedNodes, activeGroups, onGroupsC
   const [newGroupType, setNewGroupType] = useState<ProxyGroupTemplate['type']>('select');
   const [newGroupFilter, setNewGroupFilter] = useState('^(.*)$');
   const [newGroupRuleLinks, setNewGroupRuleLinks] = useState('');
+  const [newGroupDialerProxy, setNewGroupDialerProxy] = useState('');
 
   const isPreset = selectedGroup ? PROXY_GROUP_TEMPLATES.some(t => t.id === selectedGroup.id) : false;
   const isUnlocked = selectedGroup ? (!isPreset || unlockedGroups[selectedGroup.id]) : false;
@@ -134,6 +135,7 @@ export default function ProxyGroupManager({ parsedNodes, activeGroups, onGroupsC
       color: 'purple',
       filter: newGroupFilter || '^(.*)$',
       ruleLinks: newGroupRuleLinks,
+      dialerProxy: newGroupDialerProxy || undefined,
     };
     const newGroups = [...activeGroups, customGroup];
     onGroupsChange(newGroups);
@@ -145,6 +147,7 @@ export default function ProxyGroupManager({ parsedNodes, activeGroups, onGroupsC
     setNewGroupType('select');
     setNewGroupFilter('^(.*)$');
     setNewGroupRuleLinks('');
+    setNewGroupDialerProxy('');
   };
 
   const handleDeleteGroup = (groupId: string) => {
@@ -349,6 +352,22 @@ export default function ProxyGroupManager({ parsedNodes, activeGroups, onGroupsC
                     onChange={(e) => setNewGroupFilter(e.target.value)}
                   />
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">
+                    链式代理 <span className="text-slate-400 font-normal">(可选)</span>
+                  </label>
+                  <select
+                    className="w-full bg-slate-50 dark:bg-[#0f151b] border border-slate-200 dark:border-slate-700 rounded h-10 px-3 text-sm text-slate-900 dark:text-white focus:ring-1 focus:ring-[var(--color-primary)] outline-none cursor-pointer"
+                    value={newGroupDialerProxy}
+                    onChange={(e) => setNewGroupDialerProxy(e.target.value)}
+                  >
+                    <option value="">不使用链式代理</option>
+                    {activeGroups.map(g => (
+                      <option key={g.id} value={g.id}>{g.icon} {g.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-400 mt-1">设置后，此组的流量将先经过所选代理组。仅 Mihomo 支持。</p>
+                </div>
                 <div className="flex-1 flex flex-col min-h-0">
                   <label className="block text-xs font-bold text-slate-500 mb-1.5">外部规则链接 (选填，每行一条)</label>
                   <textarea
@@ -443,9 +462,9 @@ export default function ProxyGroupManager({ parsedNodes, activeGroups, onGroupsC
                 </div>
                 <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1.5">策略类型</label>
-                {selectedGroup.id === '1' ? (
+                {selectedGroup.id === '1' || selectedGroup.id === '24' ? (
                   <div className="px-3 py-2 rounded bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-500">
-                    <span className="font-bold text-slate-700 dark:text-slate-300">SELECT</span> · 手动选择 <span className="text-slate-400 ml-2">(节点选择仅支持此策略)</span>
+                    <span className="font-bold text-slate-700 dark:text-slate-300">SELECT</span> · 手动选择 <span className="text-slate-400 ml-2">({selectedGroup.id === '1' ? '节点选择' : '落地节点'}仅支持此策略)</span>
                   </div>
                 ) : selectedGroup.id === '2' ? (
                   <div className="px-3 py-2 rounded bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-500">
@@ -472,6 +491,30 @@ export default function ProxyGroupManager({ parsedNodes, activeGroups, onGroupsC
                 </div>
                 )}
                 </div>
+
+                {/* Dialer Proxy (Proxy Chain) - optional */}
+                {selectedGroup.id !== '1' && (
+                <div className="mb-4">
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">
+                    链式代理 <span className="text-slate-400 font-normal">(可选)</span>
+                  </label>
+                  <select
+                    key={`dialer-${selectedGroup.id}`}
+                    className="w-full bg-slate-50 dark:bg-[#0f151b] border border-slate-200 dark:border-slate-700 rounded h-10 px-3 text-sm text-slate-900 dark:text-white focus:ring-1 focus:ring-[var(--color-primary)] outline-none cursor-pointer"
+                    defaultValue={selectedGroup.dialerProxy || ''}
+                    onChange={(e) => updateSelectedGroup({ dialerProxy: e.target.value || undefined })}
+                  >
+                    <option value="">不使用链式代理</option>
+                    {activeGroups
+                      .filter(g => g.id !== selectedGroup.id)
+                      .map(g => (
+                        <option key={g.id} value={g.id}>{g.icon} {g.name}</option>
+                      ))
+                    }
+                  </select>
+                  <p className="text-[10px] text-slate-400 mt-1">设置后，此组的流量将先经过所选代理组再到达目标。仅 Mihomo 内核支持。</p>
+                </div>
+                )}
 
                 {(() => {
                   const hasRules = isPreset ? !!getDefaultRuleLinks(selectedGroup) : true;
