@@ -79,6 +79,7 @@ export const generateConfig = (req: GenerateRequest): string => {
 
   for (const group of proxyGroups) {
     const fullName = `${group.icon} ${group.name}`;
+    console.log('[GEN] proxy-group:', group.id, '→', fullName, 'type:', group.type);
     const matched = matchProxies(proxies, group.filter);
     const groupProxies: string[] = [];
 
@@ -160,8 +161,8 @@ export const generateConfig = (req: GenerateRequest): string => {
       else if (actualUrl.includes('geosite')) behavior = 'domain';
 
       const basename = actualUrl.split('/').pop()?.replace(/\.(yaml|yml|mrs)$/, '') || 'custom';
-      // keep original name if possible so config looks familiar
-      const providerName = basename;
+      // Custom groups use readable name-based provider key
+      const providerName = group.id.startsWith('custom-') ? `custom-${group.name.toLowerCase()}` : basename;
       
       usedProviders[providerName] = {
         type: 'http',

@@ -72,6 +72,10 @@ export default function App() {
   const [currentConfigId, setCurrentConfigId] = useState<number | null>(null);
   const [currentConfigName, setCurrentConfigName] = useState('');
 
+  // Branch creation modal state
+  const [branchModalOpen, setBranchModalOpen] = useState(false);
+  const [branchNameInput, setBranchNameInput] = useState('');
+
   // --- Generate config handler ---
   const handleGenerate = useCallback(async () => {
     if (parsedNodes.length === 0) {
@@ -171,8 +175,9 @@ export default function App() {
       return;
     }
 
-    const branchName = prompt('请输入分支备注名称:', `分支 - ${new Date().toLocaleString('zh-CN')}`);
-    if (!branchName) return;
+    const branchName = branchNameInput.trim() || `分支 - ${new Date().toLocaleString('zh-CN')}`;
+    setBranchModalOpen(false);
+    setBranchNameInput('');
 
     setIsSavingCloud(true);
     try {
@@ -200,8 +205,6 @@ export default function App() {
       if (data.success) {
         setCurrentConfigId(Number(data.configId));
         setCurrentConfigName(branchName);
-        // Show only the new branch's cloud link, not the parent's
-        setCloudUrl(window.location.origin + data.subUrl);
         toast('success', `分支「${branchName}」已创建`);
       }
     } catch {
@@ -298,7 +301,7 @@ export default function App() {
             onCloudSave={handleCloudSave}
             isSavingCloud={isSavingCloud}
             cloudUrl={cloudUrl}
-            onSaveAsBranch={handleSaveAsBranch}
+            onSaveAsBranch={() => setBranchModalOpen(true)}
             currentConfigName={currentConfigName}
             currentConfigId={currentConfigId}
           />
@@ -323,6 +326,34 @@ export default function App() {
         </>
         )}
       </main>
+
+      {/* Branch name modal */}
+      {branchModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-md mx-4 p-6 animate-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">创建配置分支</h3>
+            <p className="text-sm text-slate-500 mb-4">为当前配置创建一个独立分支，独立修改互不影响。</p>
+            <input
+              autoFocus
+              className="w-full bg-slate-50 dark:bg-[#0f151b] border border-slate-200 dark:border-slate-700 rounded-lg h-11 px-4 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-[var(--color-primary)] outline-none"
+              placeholder={`分支 - ${new Date().toLocaleString('zh-CN')}`}
+              value={branchNameInput}
+              onChange={(e) => setBranchNameInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveAsBranch(); }}
+            />
+            <div className="flex justify-end gap-3 mt-5">
+              <button
+                onClick={() => { setBranchModalOpen(false); setBranchNameInput(''); }}
+                className="px-5 py-2.5 rounded-lg text-sm font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >取消</button>
+              <button
+                onClick={handleSaveAsBranch}
+                className="px-6 py-2.5 rounded-lg bg-[var(--color-primary)] text-black text-sm font-bold shadow-md hover:bg-[var(--color-primary-dark)] transition-colors cursor-pointer"
+              >创建分支</button>
+            </div>
+          </div>
+        </div>
+      )}
       <Footer />
     </div>
     </ToastProvider>

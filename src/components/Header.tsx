@@ -40,7 +40,7 @@ export default function Header({ onLogout, activeView = 'dashboard', onViewChang
             <span className="material-symbols-outlined text-[20px]">bolt</span>
           </div>
           <h2 className="text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight tracking-[-0.015em]">
-            Ruley <span className="text-slate-500 dark:text-[var(--color-primary)] font-normal">Pro</span>
+            Ruley
           </h2>
         </div>
 

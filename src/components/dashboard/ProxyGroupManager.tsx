@@ -32,8 +32,9 @@ export default function ProxyGroupManager({ parsedNodes, activeGroups, onGroupsC
     { label: '日本', value: '(日本|川日|东京|大阪|泉日|埼玉|沪日|深日|JP|Japan)' },
     { label: '美国', value: '(美国|波特兰|达拉斯|俄勒冈|凤凰城|费城|洛杉矶|圣克拉拉|西雅图|芝加哥|US|United States)' },
     { label: '韩国', value: '(韩国|首尔|KR|Korea)' },
-    { label: '家宽直连', value: '(家电|家宽|ISP|住宅)' },
-    { label: '高优 / 专线', value: '(专线|IPLC|BGP|IEPL|高级|Premium)' },
+    { label: '家宽', value: '(家电|家宽|ISP|住宅)' },
+    { label: '专线', value: '(专线|IPLC|BGP|IEPL|高级|Premium)' },
+    {label: '落地', value: '(落地)'},
     { label: '低倍率', value: '(0\\.\\d|\\b1\\.0\\b|低倍)' },
   ];
 
@@ -127,7 +128,7 @@ export default function ProxyGroupManager({ parsedNodes, activeGroups, onGroupsC
   const handleCreateCustomGroup = () => {
     if (!newGroupName.trim()) return;
     const customGroup: ProxyGroupTemplate = {
-      id: `custom-${Date.now()}`,
+      id: `custom-${newGroupName.trim()}`,
       icon: newGroupIcon || '🌐',
       name: newGroupName.trim(),
       type: newGroupType,
