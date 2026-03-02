@@ -135,7 +135,7 @@ export default function App() {
           proxyGroups: proxyGroups.map(g => ({
             id: g.id, icon: g.icon, name: g.name, ruleSets: g.ruleSets,
             ruleLinks: g.ruleLinks, filter: g.filter, type: g.type,
-            color: g.color, desc: g.desc,
+            color: g.color, desc: g.desc, dialerProxy: g.dialerProxy,
           })),
           rules,
           platform: targetPlatform,
@@ -185,7 +185,7 @@ export default function App() {
           proxyGroups: proxyGroups.map(g => ({
             id: g.id, icon: g.icon, name: g.name, ruleSets: g.ruleSets,
             ruleLinks: g.ruleLinks, filter: g.filter, type: g.type,
-            color: g.color, desc: g.desc,
+            color: g.color, desc: g.desc, dialerProxy: g.dialerProxy,
           })),
           rules,
           platform: targetPlatform,

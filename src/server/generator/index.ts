@@ -9,10 +9,11 @@ export interface GroupConfig {
   id: string;
   icon: string;
   name: string;
-  type: 'select' | 'url-test' | 'fallback';
+  type: 'select' | 'url-test' | 'fallback' | 'reject' | '🚀 节点选择' | '⚡ 自动选择';
   filter: string;
   ruleLinks?: string;
   ruleSets?: [string, boolean][];
+  dialerProxy?: string;
 }
 
 export interface RuleItem {
@@ -81,7 +82,17 @@ export const generateConfig = (req: GenerateRequest): string => {
     const matched = matchProxies(proxies, group.filter);
     const groupProxies: string[] = [];
 
-    if (group.type === 'select') {
+    // Resolve actual type: '🚀 节点选择' and '⚡ 自动选择' are group references
+    let actualType = group.type;
+    if (actualType === '🚀 节点选择' || actualType === '⚡ 自动选择') {
+      // These are "use another group" types — implemented as select with the target group as sole proxy
+      const targetGroupName = actualType === '🚀 节点选择' ? mainGroupName : (autoGroupName || mainGroupName);
+      groupProxies.push(targetGroupName, 'DIRECT');
+      actualType = 'select';
+    } else if (actualType === 'reject') {
+      groupProxies.push('REJECT');
+      actualType = 'select';
+    } else if (actualType === 'select') {
       if (group.id === '1') {
         if (autoGroupName) groupProxies.push(autoGroupName);
         groupProxies.push('DIRECT', 'REJECT', ...matched);
@@ -104,14 +115,22 @@ export const generateConfig = (req: GenerateRequest): string => {
 
     const clashGroup: any = {
       name: fullName,
-      type: group.type,
+      type: actualType,
       proxies: [...new Set(groupProxies)],
     };
 
-    if (group.type === 'url-test' || group.type === 'fallback') {
+    if (actualType === 'url-test' || actualType === 'fallback') {
       clashGroup.url = 'https://www.gstatic.com/generate_204';
       clashGroup.interval = 300;
       clashGroup.lazy = false;
+    }
+
+    // Inject dialer-proxy for proxy chaining
+    if (group.dialerProxy) {
+      const dp = proxyGroups.find(g => g.id === group.dialerProxy);
+      if (dp) {
+        clashGroup['dialer-proxy'] = `${dp.icon} ${dp.name}`;
+      }
     }
 
     clashProxyGroups.push(clashGroup);

@@ -98,6 +98,8 @@ export interface ProxyGroupTemplate {
   ruleLinks?: string;
   /** Rule-set entries: [providerName, noResolve] */
   ruleSets?: [string, boolean][];
+  /** Optional dialer-proxy: route through another proxy group */
+  dialerProxy?: string;
 }
 
 export function getDefaultRuleLinks(template: ProxyGroupTemplate): string {
