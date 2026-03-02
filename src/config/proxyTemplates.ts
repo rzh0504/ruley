@@ -114,6 +114,7 @@ export function getDefaultRuleLinks(template: ProxyGroupTemplate): string {
 export const PROXY_GROUP_TEMPLATES: ProxyGroupTemplate[] = [
   { id: '1', icon: '🚀', name: '节点选择', type: 'select', desc: '手动选择代理节点', color: 'blue', filter: '^(.*)$' },
   { id: '2', icon: '⚡', name: '自动选择', type: 'url-test', desc: '根据延迟自动选择最优节点', color: 'purple', filter: '^(.*)$' },
+  { id: '24', icon: '🎯', name: '落地节点', type: 'select', desc: '指定出口落地节点，常用于链式代理', color: 'green', filter: '^(.*)$' },
   { id: '3', icon: '🛑', name: '广告拦截', type: 'reject', desc: '广告及追踪器拦截策略', color: 'red', filter: '(REJECT|DIRECT)',
     ruleSets: [['category-ads-all', false]] },
   { id: '4', icon: '🤖', name: 'AI 服务', type: 'select', desc: 'OpenAI, Anthropic 等 AI 服务分流', color: 'blue', filter: '^(HK|SG|US|JP)',

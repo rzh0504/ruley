@@ -462,9 +462,9 @@ export default function ProxyGroupManager({ parsedNodes, activeGroups, onGroupsC
                 </div>
                 <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1.5">策略类型</label>
-                {selectedGroup.id === '1' ? (
+                {selectedGroup.id === '1' || selectedGroup.id === '24' ? (
                   <div className="px-3 py-2 rounded bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-500">
-                    <span className="font-bold text-slate-700 dark:text-slate-300">SELECT</span> · 手动选择 <span className="text-slate-400 ml-2">(节点选择仅支持此策略)</span>
+                    <span className="font-bold text-slate-700 dark:text-slate-300">SELECT</span> · 手动选择 <span className="text-slate-400 ml-2">({selectedGroup.id === '1' ? '节点选择' : '落地节点'}仅支持此策略)</span>
                   </div>
                 ) : selectedGroup.id === '2' ? (
                   <div className="px-3 py-2 rounded bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-500">

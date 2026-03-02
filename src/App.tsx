@@ -94,6 +94,7 @@ export default function App() {
             ruleLinks: g.ruleLinks,
             filter: g.filter,
             type: g.type,
+            dialerProxy: g.dialerProxy,
           })),
           rules: rules,
           platform: targetPlatform,

@@ -93,7 +93,7 @@ export const generateConfig = (req: GenerateRequest): string => {
       groupProxies.push('REJECT');
       actualType = 'select';
     } else if (actualType === 'select') {
-      if (group.id === '1') {
+      if (group.id === '1' || group.id === '24') {
         if (autoGroupName) groupProxies.push(autoGroupName);
         groupProxies.push('DIRECT', 'REJECT', ...matched);
       } else if (group.id === '3') {
