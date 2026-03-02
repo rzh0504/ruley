@@ -72,9 +72,6 @@ export default function SubscriptionCard({
           <span className="material-symbols-outlined text-slate-400 text-[20px]">link</span>
           订阅来源输入
         </h3>
-        <button className="text-slate-500 hover:text-[var(--color-primary)] text-xs font-bold transition-colors cursor-pointer">
-          管理 API 密钥
-        </button>
       </div>
       <div className="flex-1 p-4 flex flex-col overflow-hidden">
         <label className="sr-only">订阅链接</label>

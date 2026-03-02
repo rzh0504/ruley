@@ -25,20 +25,19 @@ export default function GenerateCard({
 }: GenerateCardProps) {
   return (
     <div className="group relative overflow-hidden rounded-xl bg-white dark:bg-[var(--color-card-dark)] shadow-sm border border-slate-200 dark:border-slate-700 md:col-span-1 lg:col-span-2 xl:col-span-3 row-span-2 flex flex-col p-5">
-      <div className="flex items-start justify-between mb-4">
-        <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-[var(--color-primary)]">
-          <span className="material-symbols-outlined">rocket_launch</span>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-900 dark:text-[var(--color-primary)]">
+            <span className="material-symbols-outlined">rocket_launch</span>
+          </div>
+          {currentConfigId && currentConfigName && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-800 dark:bg-[var(--color-primary)] rounded-lg">
+              <span className="material-symbols-outlined text-[13px] text-white dark:text-black">edit_document</span>
+              <span className="text-[11px] font-bold text-white dark:text-black truncate max-w-[120px]">{currentConfigName}</span>
+            </div>
+          )}
         </div>
-        <span className="text-xs font-mono text-slate-400">#快捷操作</span>
       </div>
-
-      {/* Current config indicator */}
-      {currentConfigId && currentConfigName && (
-        <div className="flex items-center gap-1.5 mb-3 px-2 py-1.5 bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/20 rounded-lg">
-          <span className="material-symbols-outlined text-[14px] text-[var(--color-primary)]">edit_document</span>
-          <span className="text-[11px] font-bold text-[var(--color-primary)] truncate">{currentConfigName}</span>
-        </div>
-      )}
       <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">一键生成</h3>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">编译当前配置并推送更新至客户端。</p>
 

@@ -90,7 +90,7 @@ export interface ProxyGroupTemplate {
   id: string;
   icon: string;
   name: string;
-  type: 'select' | 'url-test' | 'fallback';
+  type: 'select' | 'url-test' | 'fallback' | 'reject' | '🚀 节点选择' | '⚡ 自动选择';
   desc: string;
   color: 'blue' | 'purple' | 'green' | 'yellow' | 'red';
   filter: string;
@@ -112,7 +112,7 @@ export function getDefaultRuleLinks(template: ProxyGroupTemplate): string {
 export const PROXY_GROUP_TEMPLATES: ProxyGroupTemplate[] = [
   { id: '1', icon: '🚀', name: '节点选择', type: 'select', desc: '手动选择代理节点', color: 'blue', filter: '^(.*)$' },
   { id: '2', icon: '⚡', name: '自动选择', type: 'url-test', desc: '根据延迟自动选择最优节点', color: 'purple', filter: '^(.*)$' },
-  { id: '3', icon: '🛑', name: '广告拦截', type: 'select', desc: '广告及追踪器拦截策略', color: 'red', filter: '(REJECT|DIRECT)',
+  { id: '3', icon: '🛑', name: '广告拦截', type: 'reject', desc: '广告及追踪器拦截策略', color: 'red', filter: '(REJECT|DIRECT)',
     ruleSets: [['category-ads-all', false]] },
   { id: '4', icon: '🤖', name: 'AI 服务', type: 'select', desc: 'OpenAI, Anthropic 等 AI 服务分流', color: 'blue', filter: '^(HK|SG|US|JP)',
     ruleSets: [['category-ai-chat-!cn', false], ['openai', false], ['anthropic', false]] },

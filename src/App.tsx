@@ -28,10 +28,12 @@ export interface RuleItem {
 }
 
 function getDefaultActiveGroups(): ProxyGroupTemplate[] {
-  return PROXY_GROUP_TEMPLATES.map(t => ({
-    ...t,
-    ruleLinks: getDefaultRuleLinks(t)
-  }));
+  return PROXY_GROUP_TEMPLATES
+    .filter(t => ['1', '2', '3', '6'].includes(t.id))
+    .map(t => ({
+      ...t,
+      ruleLinks: getDefaultRuleLinks(t)
+    }));
 }
 
 export default function App() {
@@ -133,6 +135,7 @@ export default function App() {
           proxyGroups: proxyGroups.map(g => ({
             id: g.id, icon: g.icon, name: g.name, ruleSets: g.ruleSets,
             ruleLinks: g.ruleLinks, filter: g.filter, type: g.type,
+            color: g.color, desc: g.desc,
           })),
           rules,
           platform: targetPlatform,
@@ -182,6 +185,7 @@ export default function App() {
           proxyGroups: proxyGroups.map(g => ({
             id: g.id, icon: g.icon, name: g.name, ruleSets: g.ruleSets,
             ruleLinks: g.ruleLinks, filter: g.filter, type: g.type,
+            color: g.color, desc: g.desc,
           })),
           rules,
           platform: targetPlatform,
@@ -227,6 +231,8 @@ export default function App() {
 
   // --- Load config from manager ---
   const handleLoadFromConfig = useCallback((config: any) => {
+    // Reset cloud URL first to prevent stale parent link from showing
+    setCloudUrl('');
     setSubscriptionUrls(config.urls || '');
     setTargetPlatform(config.platform || 'clash');
     setAdvancedDns(config.advanced_dns === 1);
@@ -234,7 +240,14 @@ export default function App() {
     setCurrentConfigName(config.name || '');
     try {
       const groups = JSON.parse(config.proxy_groups || '[]');
-      if (groups.length > 0) setProxyGroups(groups);
+      if (groups.length > 0) {
+        // Enrich loaded groups with template defaults (color, desc) for backwards compat
+        const enriched = groups.map((g: any) => {
+          const template = PROXY_GROUP_TEMPLATES.find(t => t.id === g.id);
+          return { ...template, ...g, color: g.color || template?.color || 'blue', desc: g.desc || template?.desc || '' };
+        });
+        setProxyGroups(enriched);
+      }
     } catch {}
     try {
       const r = JSON.parse(config.rules || '[]');
@@ -246,11 +259,8 @@ export default function App() {
       setParsedNodes(nodes);
     } catch { setParsedNodes([]); }
     setGeneratedConfig(config.generated_config || '');
-    if (config.cloud_token) {
-      setCloudUrl(window.location.origin + `/api/sub/${config.cloud_token}`);
-    } else {
-      setCloudUrl('');
-    }
+    // Cloud URL is intentionally NOT restored here — it should only
+    // appear after the user explicitly clicks "托管云端" or "更新云端"
     setActiveView('dashboard');
   }, []);
 
