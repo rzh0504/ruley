@@ -1,11 +1,16 @@
 import express from 'express';
 import cors from 'cors';
 import crypto from 'crypto';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import db, { initDb } from './db/index.js';
 import { parseInput } from './parser/index.js';
 import { generateConfig } from './generator/index.js';
 import { authMiddleware, handleLogin, handleMe } from './auth.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
@@ -313,6 +318,19 @@ app.post('/api/cloud-save', authMiddleware, (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// ============================================================================
+// Production: serve frontend static files
+// ============================================================================
+
+if (process.env.NODE_ENV === 'production') {
+  const distPath = path.resolve(__dirname, '../../dist');
+  app.use(express.static(distPath));
+  // SPA fallback: any non-API route serves index.html
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
 
 // ============================================================================
 // Global error handler

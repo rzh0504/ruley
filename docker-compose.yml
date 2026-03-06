@@ -1,0 +1,13 @@
+services:
+  ruley:
+    build: .
+    container_name: ruley
+    restart: unless-stopped
+    ports:
+      - "${PORT:-4000}:4000"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
