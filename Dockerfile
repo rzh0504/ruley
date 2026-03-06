@@ -1,5 +1,5 @@
 # ============================================================================
-# Stage 1: Build frontend
+# Stage 1: Build everything
 # ============================================================================
 FROM node:20-alpine AS builder
 
@@ -8,34 +8,50 @@ WORKDIR /app
 # Install build tools for native modules (better-sqlite3)
 RUN apk add --no-cache python3 make g++
 
-# Install dependencies
+# Install all dependencies
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# Copy source and build frontend
+# Copy source
 COPY . .
+
+# Build frontend (Vite)
 RUN npm run build
 
+# Bundle server into a single JS file with esbuild
+# Externalize better-sqlite3 (native module, can't be bundled)
+RUN npx esbuild src/server/index.ts \
+    --bundle \
+    --platform=node \
+    --format=esm \
+    --target=node20 \
+    --outfile=server.mjs \
+    --external:better-sqlite3
+
 # ============================================================================
-# Stage 2: Production
+# Stage 2: Production (minimal)
 # ============================================================================
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Install build tools for native modules (better-sqlite3 needs rebuild)
+# Install only better-sqlite3 native module
 RUN apk add --no-cache python3 make g++
-
-# Copy package files and install production deps
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && apk del python3 make g++
+RUN npm ci --omit=dev && \
+    # Remove everything except better-sqlite3
+    find node_modules -maxdepth 1 -mindepth 1 \
+    ! -name 'better-sqlite3' \
+    ! -name 'bindings' \
+    ! -name 'prebuild-install' \
+    ! -name 'file-uri-to-path' \
+    ! -name 'node-addon-api' \
+    -exec rm -rf {} + && \
+    apk del python3 make g++
 
-# Copy built frontend
+# Copy bundled server + built frontend
+COPY --from=builder /app/server.mjs ./
 COPY --from=builder /app/dist ./dist
-
-# Copy server source
-COPY src/server ./src/server
-COPY tsconfig.json ./
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data
@@ -46,4 +62,4 @@ ENV PORT=4000
 
 EXPOSE 4000
 
-CMD ["npx", "tsx", "src/server/index.ts"]
+CMD ["node", "server.mjs"]

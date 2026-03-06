@@ -2,7 +2,7 @@ services:
   ruley:
     build: .
     # Or pull from GHCR instead of building locally:
-    # image: ghcr.io/rzh0504/ruley:latest
+    image: ghcr.io/rzh0504/ruley:latest
     container_name: ruley
     restart: unless-stopped
     ports:
