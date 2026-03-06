@@ -23,9 +23,9 @@ RUN npm run build
 RUN npx esbuild src/server/index.ts \
     --bundle \
     --platform=node \
-    --format=esm \
+    --format=cjs \
     --target=node20 \
-    --outfile=server.mjs \
+    --outfile=server.cjs \
     --external:better-sqlite3
 
 # ============================================================================
@@ -50,7 +50,7 @@ RUN npm ci --omit=dev && \
     apk del python3 make g++
 
 # Copy bundled server + built frontend
-COPY --from=builder /app/server.mjs ./
+COPY --from=builder /app/server.cjs ./
 COPY --from=builder /app/dist ./dist
 
 # Create data directory for SQLite
@@ -62,4 +62,4 @@ ENV PORT=4000
 
 EXPOSE 4000
 
-CMD ["node", "server.mjs"]
+CMD ["node", "server.cjs"]
