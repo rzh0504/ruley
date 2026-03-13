@@ -1,64 +1,45 @@
-# ============================================================================
-# Stage 1: Build everything
-# ============================================================================
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install build tools for native modules (better-sqlite3)
+# Build better-sqlite3 once in the builder stage.
 RUN apk add --no-cache python3 make g++
 
-# Install all dependencies
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --no-audit --no-fund
 
-# Copy source
 COPY . .
 
-# Build frontend (Vite)
 RUN npm run build
 
-# Bundle server into a single JS file with esbuild
-# Externalize better-sqlite3 (native module, can't be bundled)
 RUN npx esbuild src/server/index.ts \
     --bundle \
     --platform=node \
     --format=cjs \
     --target=node20 \
+    --minify \
     --outfile=server.cjs \
     --external:better-sqlite3
 
-# ============================================================================
-# Stage 2: Production (minimal)
-# ============================================================================
-FROM node:20-alpine
+FROM node:20-alpine AS runtime
 
 WORKDIR /app
 
-# Install only better-sqlite3 native module
-RUN apk add --no-cache python3 make g++
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && \
-    # Remove everything except better-sqlite3
-    find node_modules -maxdepth 1 -mindepth 1 \
-    ! -name 'better-sqlite3' \
-    ! -name 'bindings' \
-    ! -name 'prebuild-install' \
-    ! -name 'file-uri-to-path' \
-    ! -name 'node-addon-api' \
-    -exec rm -rf {} + && \
-    apk del python3 make g++
+ENV NODE_ENV=production
+ENV PORT=4000
+ENV NODE_OPTIONS=--max-old-space-size=256
 
-# Copy bundled server + built frontend
 COPY --from=builder /app/server.cjs ./
 COPY --from=builder /app/dist ./dist
 
-# Create data directory for SQLite
-RUN mkdir -p /app/data
+# Copy only the native SQLite runtime bits that the bundled server still needs.
+COPY --from=builder /app/node_modules/better-sqlite3/package.json ./node_modules/better-sqlite3/package.json
+COPY --from=builder /app/node_modules/better-sqlite3/lib ./node_modules/better-sqlite3/lib
+COPY --from=builder /app/node_modules/better-sqlite3/build/Release ./node_modules/better-sqlite3/build/Release
+COPY --from=builder /app/node_modules/bindings ./node_modules/bindings
+COPY --from=builder /app/node_modules/file-uri-to-path ./node_modules/file-uri-to-path
 
-# Environment
-ENV NODE_ENV=production
-ENV PORT=4000
+RUN mkdir -p /app/data
 
 EXPOSE 4000
 

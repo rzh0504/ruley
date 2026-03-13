@@ -1,10 +1,14 @@
 services:
   ruley:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     # Or pull from GHCR instead of building locally:
     image: ghcr.io/rzh0504/ruley:latest
     container_name: ruley
     restart: unless-stopped
+    init: true
+    mem_limit: ${MEM_LIMIT:-512m}
     ports:
       - "${PORT:-4000}:4000"
     volumes:
@@ -12,4 +16,5 @@ services:
     env_file:
       - .env
     environment:
-      - NODE_ENV=production
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE:-256}
