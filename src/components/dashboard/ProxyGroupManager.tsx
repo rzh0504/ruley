@@ -23,6 +23,8 @@ export default function ProxyGroupManager({ parsedNodes, activeGroups, onGroupsC
 
   const isPreset = selectedGroup ? PROXY_GROUP_TEMPLATES.some(t => t.id === selectedGroup.id) : false;
   const isUnlocked = selectedGroup ? (!isPreset || unlockedGroups[selectedGroup.id]) : false;
+  const getEffectiveRuleLinks = (group: ProxyGroupTemplate) =>
+    group.ruleLinks !== undefined ? group.ruleLinks : getDefaultRuleLinks(group);
 
   const COMMON_FILTERS = [
     { label: '全部', value: '^(.*)$' },
@@ -240,9 +242,19 @@ export default function ProxyGroupManager({ parsedNodes, activeGroups, onGroupsC
                     )}
                   </div>
                 </div>
-                <div className={`text-xs truncate ${selectedGroup?.id === group.id ? 'text-slate-500' : 'text-slate-400'}`} title={group.ruleLinks || '无配置'}>
-                  {group.ruleLinks ? group.ruleLinks.split('\n')[0] + (group.ruleLinks.includes('\n') ? ' ...' : '') : '无外接规则'}
-                </div>
+                {(() => {
+                  const effectiveRuleLinks = getEffectiveRuleLinks(group);
+                  return (
+                    <div
+                      className={`text-xs truncate ${selectedGroup?.id === group.id ? 'text-slate-500' : 'text-slate-400'}`}
+                      title={effectiveRuleLinks || '无配置'}
+                    >
+                      {effectiveRuleLinks
+                        ? effectiveRuleLinks.split('\n')[0] + (effectiveRuleLinks.includes('\n') ? ' ...' : '')
+                        : '无外接规则'}
+                    </div>
+                  );
+                })()}
                 {selectedGroup?.id === group.id && (
                   <div className="absolute left-0 top-2 bottom-2 w-1 bg-[var(--color-primary)] rounded-r"></div>
                 )}

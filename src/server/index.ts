@@ -13,6 +13,15 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 4000;
 
+const getSubscriptionName = (value?: unknown) =>
+  typeof value === 'string' && value.trim() ? value.trim() : 'ruley';
+
+const buildSubUrl = (token: string, name?: unknown) =>
+  `/api/sub/${token}/${encodeURIComponent(getSubscriptionName(name))}`;
+
+const getSafeFilename = (value?: unknown) =>
+  getSubscriptionName(value).replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-');
+
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
@@ -37,7 +46,7 @@ app.post('/api/auth/login', handleLogin);
 // ============================================================================
 
 // Subscription delivery endpoint (called by Clash clients)
-app.get('/api/sub/:token', async (req, res) => {
+app.get(['/api/sub/:token', '/api/sub/:token/:name'], async (req, res) => {
   const token = req.params.token;
   try {
     const row = db.prepare('SELECT * FROM configs WHERE cloud_token = ?').get(token) as any;
@@ -55,7 +64,7 @@ app.get('/api/sub/:token', async (req, res) => {
     });
 
     res.setHeader('Content-Type', 'text/yaml; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="ruley-${token.slice(0, 8)}.yaml"`);
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`${getSafeFilename(row.name)}.yaml`)}`);
     res.send(yamlStr);
   } catch (err: any) {
     console.error('[SUB] Generation error:', err);
@@ -239,11 +248,12 @@ app.post('/api/configs/:id/cloud', authMiddleware, (req, res) => {
       // Generate new token
       token = crypto.randomBytes(12).toString('hex');
       db.prepare('UPDATE configs SET cloud_token = ?, cloud_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-        .run(token, `/api/sub/${token}`, req.params.id);
+        .run(token, buildSubUrl(token, row.name), req.params.id);
     }
 
-    const cloudUrl = `${req.protocol}://${req.get('host')}/api/sub/${token}`;
-    res.json({ success: true, token, cloudUrl, subUrl: `/api/sub/${token}` });
+    const subUrl = buildSubUrl(token, row.name);
+    const cloudUrl = `${req.protocol}://${req.get('host')}${subUrl}`;
+    res.json({ success: true, token, cloudUrl, subUrl });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -256,6 +266,7 @@ app.post('/api/configs/:id/cloud', authMiddleware, (req, res) => {
 app.post('/api/cloud-save', authMiddleware, (req, res) => {
   const { urls, proxyGroups, rules, platform, advancedDns, parsedNodes, generatedConfig, nodeCount, configId, name, parentId } = req.body;
   if (!urls) return res.status(400).json({ success: false, error: 'urls is required' });
+  const configName = getSubscriptionName(name);
 
   try {
     // Upsert: if configId is provided, update existing record
@@ -271,7 +282,7 @@ app.post('/api/cloud-save', authMiddleware, (req, res) => {
             updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
         `).run(
-          name || null,
+          configName,
           urls, platform || 'clash', advancedDns ? 1 : 0,
           JSON.stringify(proxyGroups || []), JSON.stringify(rules || []),
           nodeCount || 0,
@@ -285,16 +296,18 @@ app.post('/api/cloud-save', authMiddleware, (req, res) => {
         if (!token) {
           token = crypto.randomBytes(12).toString('hex');
           db.prepare('UPDATE configs SET cloud_token = ?, cloud_url = ? WHERE id = ?')
-            .run(token, `/api/sub/${token}`, configId);
+            .run(token, buildSubUrl(token, configName), configId);
         }
 
-        return res.json({ success: true, token, subUrl: `/api/sub/${token}`, configId });
+        db.prepare('UPDATE configs SET cloud_url = ? WHERE id = ?')
+          .run(buildSubUrl(token, configName), configId);
+
+        return res.json({ success: true, token, subUrl: buildSubUrl(token, configName), configId });
       }
     }
 
     // Create new record
     const token = crypto.randomBytes(12).toString('hex');
-    const configName = name || `云端配置 - ${new Date().toLocaleString('zh-CN')}`;
     const result = db.prepare(`
       INSERT INTO configs (name, urls, platform, advanced_dns, proxy_groups, rules, node_count, parsed_nodes, generated_config, cloud_token, cloud_url, parent_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -304,11 +317,11 @@ app.post('/api/cloud-save', authMiddleware, (req, res) => {
       nodeCount || 0,
       parsedNodes ? JSON.stringify(parsedNodes) : null,
       generatedConfig || null,
-      token, `/api/sub/${token}`,
+      token, buildSubUrl(token, configName),
       parentId || null
     );
 
-    res.json({ success: true, token, subUrl: `/api/sub/${token}`, configId: result.lastInsertRowid });
+    res.json({ success: true, token, subUrl: buildSubUrl(token, configName), configId: result.lastInsertRowid });
   } catch (err: any) {
     console.error('[CLOUD] Save error:', err);
     res.status(500).json({ success: false, error: err.message });

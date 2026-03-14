@@ -99,7 +99,7 @@ export const generateConfig = (req: GenerateRequest): string => {
         groupProxies.push('DIRECT', 'REJECT', ...matched);
       } else if (group.id === '3') {
         groupProxies.push('REJECT', 'DIRECT', mainGroupName);
-      } else if (group.id === '20' || group.id === '21') {
+      } else if (group.id === '20' || group.id === '21' || group.id === '25') {
         groupProxies.push('DIRECT', 'REJECT', mainGroupName);
         if (autoGroupName) groupProxies.push(autoGroupName);
         groupProxies.push(...matched);
@@ -144,35 +144,45 @@ export const generateConfig = (req: GenerateRequest): string => {
   for (const group of proxyGroups) {
     const fullName = `${group.icon} ${group.name}`;
 
-    const ruleLinksStr = group.ruleLinks || '';
-    const urlLines = ruleLinksStr.split('\n').map(l => l.trim()).filter(Boolean);
-    
-    for (const urlStr of urlLines) {
-      let actualUrl = urlStr;
-      let noResolve = false;
-      if (actualUrl.endsWith(',no-resolve')) {
-        actualUrl = actualUrl.replace(',no-resolve', '');
-        noResolve = true;
-      }
-      
-      let behavior = 'domain';
-      if (actualUrl.includes('geoip') || actualUrl.includes('ipcidr')) behavior = 'ipcidr';
-      else if (actualUrl.includes('classical')) behavior = 'classical';
-      else if (actualUrl.includes('geosite')) behavior = 'domain';
+    if (group.ruleLinks !== undefined) {
+      const urlLines = group.ruleLinks.split('\n').map(l => l.trim()).filter(Boolean);
 
-      const basename = actualUrl.split('/').pop()?.replace(/\.(yaml|yml|mrs)$/, '') || 'custom';
-      // Custom groups use readable name-based provider key
-      const providerName = group.id.startsWith('custom-') ? `custom-${group.name.toLowerCase()}` : basename;
-      
-      usedProviders[providerName] = {
-        type: 'http',
-        behavior,
-        url: actualUrl,
-        path: `./ruleset/${basename}.${actualUrl.endsWith('.mrs') ? 'mrs' : 'yaml'}`,
-        interval: 86400,
-        format: actualUrl.endsWith('.mrs') ? 'mrs' : 'yaml'
-      };
-      
+      for (const urlStr of urlLines) {
+        let actualUrl = urlStr;
+        let noResolve = false;
+        if (actualUrl.endsWith(',no-resolve')) {
+          actualUrl = actualUrl.replace(',no-resolve', '');
+          noResolve = true;
+        }
+
+        let behavior = 'domain';
+        if (actualUrl.includes('geoip') || actualUrl.includes('ipcidr')) behavior = 'ipcidr';
+        else if (actualUrl.includes('classical')) behavior = 'classical';
+        else if (actualUrl.includes('geosite')) behavior = 'domain';
+
+        const basename = actualUrl.split('/').pop()?.replace(/\.(yaml|yml|mrs)$/, '') || 'custom';
+        // Custom groups use readable name-based provider key
+        const providerName = group.id.startsWith('custom-') ? `custom-${group.name.toLowerCase()}` : basename;
+
+        usedProviders[providerName] = {
+          type: 'http',
+          behavior,
+          url: actualUrl,
+          path: `./ruleset/${basename}.${actualUrl.endsWith('.mrs') ? 'mrs' : 'yaml'}`,
+          interval: 86400,
+          format: actualUrl.endsWith('.mrs') ? 'mrs' : 'yaml'
+        };
+
+        ruleSetRules.push(`RULE-SET,${providerName},${fullName}${noResolve ? ',no-resolve' : ''}`);
+      }
+      continue;
+    }
+
+    for (const [providerName, noResolve] of group.ruleSets || []) {
+      const provider = RULE_PROVIDERS[providerName];
+      if (!provider) continue;
+
+      usedProviders[providerName] = { ...provider };
       ruleSetRules.push(`RULE-SET,${providerName},${fullName}${noResolve ? ',no-resolve' : ''}`);
     }
   }

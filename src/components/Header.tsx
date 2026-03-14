@@ -25,10 +25,10 @@ export default function Header({ onLogout, activeView = 'dashboard', onViewChang
   };
 
   const navBtnClass = (view: string) =>
-    `flex items-center gap-1.5 px-3 py-1.5 text-sm font-bold rounded-lg transition-all cursor-pointer ${
+    `flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-lg transition-colors cursor-pointer border ${
       activeView === view
-        ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white'
-        : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+        ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-900 dark:border-slate-100'
+        : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 border-transparent hover:border-slate-200 dark:hover:border-slate-700'
     }`;
 
   return (
@@ -46,7 +46,7 @@ export default function Header({ onLogout, activeView = 'dashboard', onViewChang
 
         {/* Navigation */}
         {onViewChange && (
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/60 p-1">
             <button onClick={() => onViewChange('dashboard')} className={navBtnClass('dashboard')}>
               <span className="material-symbols-outlined text-[18px]">dashboard</span>
               控制台
@@ -60,10 +60,9 @@ export default function Header({ onLogout, activeView = 'dashboard', onViewChang
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="hidden md:flex items-center gap-2 text-sm font-medium text-slate-500 mr-2">
-          <span className="flex items-center gap-1">
-            <span className="block w-2 h-2 rounded-full bg-[var(--color-primary)] animate-pulse"></span> API 在线
-          </span>
+        <div className="hidden md:inline-flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/60 px-3 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+          <span className="block w-2 h-2 rounded-full bg-[var(--color-primary)]"></span>
+          API 在线
         </div>
         <button 
           onClick={toggleTheme}

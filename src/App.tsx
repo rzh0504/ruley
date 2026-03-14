@@ -29,7 +29,7 @@ export interface RuleItem {
 
 function getDefaultActiveGroups(): ProxyGroupTemplate[] {
   return PROXY_GROUP_TEMPLATES
-    .filter(t => ['1', '2', '3', '6'].includes(t.id))
+    .filter(t => ['1', '2', '3', '6', '25'].includes(t.id))
     .map(t => ({
       ...t,
       ruleLinks: getDefaultRuleLinks(t)
@@ -75,6 +75,7 @@ export default function App() {
   // Branch creation modal state
   const [branchModalOpen, setBranchModalOpen] = useState(false);
   const [branchNameInput, setBranchNameInput] = useState('');
+  const effectiveSubscriptionName = currentConfigName.trim() || 'ruley';
 
   // --- Generate config handler ---
   const handleGenerate = useCallback(async () => {
@@ -136,7 +137,7 @@ export default function App() {
         body: JSON.stringify({
           urls: subscriptionUrls,
           configId: currentConfigId,
-          name: currentConfigName || undefined,
+          name: effectiveSubscriptionName,
           proxyGroups: proxyGroups.map(g => ({
             id: g.id, icon: g.icon, name: g.name, ruleSets: g.ruleSets,
             ruleLinks: g.ruleLinks, filter: g.filter, type: g.type,
@@ -166,7 +167,7 @@ export default function App() {
     } finally {
       setIsSavingCloud(false);
     }
-  }, [subscriptionUrls, proxyGroups, rules, targetPlatform, advancedDns, parsedNodes, generatedConfig, currentConfigId, currentConfigName]);
+  }, [subscriptionUrls, proxyGroups, rules, targetPlatform, advancedDns, parsedNodes, generatedConfig, currentConfigId, effectiveSubscriptionName]);
 
   // --- Save as Branch (new config with same URLs, linked via parent_id) ---
   const handleSaveAsBranch = useCallback(async () => {
@@ -306,6 +307,8 @@ export default function App() {
             currentConfigId={currentConfigId}
           />
           <SubscriptionCard 
+            subscriptionName={currentConfigName}
+            onSubscriptionNameChange={setCurrentConfigName}
             urls={subscriptionUrls}
             onUrlsChange={setSubscriptionUrls}
             onNodesParsed={(nodes) => setParsedNodes(nodes)} 

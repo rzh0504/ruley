@@ -32,6 +32,10 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(diff / 86400)} 天前`;
 }
 
+function buildCloudSubUrl(token: string, name?: string): string {
+  return `${window.location.origin}/api/sub/${token}/${encodeURIComponent(name?.trim() || 'ruley')}`;
+}
+
 interface ConfigManagerProps {
   onLoadConfig?: (config: any) => void;
 }
@@ -276,11 +280,11 @@ export default function ConfigManager({ onLoadConfig }: ConfigManagerProps) {
                   {config.cloud_token && (
                     <div className="mt-2 flex items-center gap-2">
                       <code className="text-[10px] font-mono text-slate-400 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 truncate max-w-[400px]">
-                        {window.location.origin}/api/sub/{config.cloud_token}
+                        {buildCloudSubUrl(config.cloud_token, config.name)}
                       </code>
                       <button
                         onClick={() => {
-                          navigator.clipboard.writeText(`${window.location.origin}/api/sub/${config.cloud_token}`);
+                          navigator.clipboard.writeText(buildCloudSubUrl(config.cloud_token, config.name));
                           toast('success', '链接已复制');
                         }}
                         className="text-slate-400 hover:text-[var(--color-primary)] cursor-pointer transition-colors"

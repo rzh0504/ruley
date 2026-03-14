@@ -149,6 +149,8 @@ export const PROXY_GROUP_TEMPLATES: ProxyGroupTemplate[] = [
     ruleSets: [['paypal', false], ['stripe', false], ['wise', false]] },
   { id: '19', icon: '₿', name: '加密货币', type: 'select', desc: 'Binance 等加密货币交易平台的分流', color: 'blue', filter: '^(HK|SG|US|JP)',
     ruleSets: [['binance', false]] },
+  { id: '25', icon: '🎯', name: '全球直连', type: 'select', desc: '私有网络与中国大陆服务的统一直连策略', color: 'green', filter: 'DIRECT',
+    ruleSets: [['private', false], ['cn', false], ['cn-ip', true]] },
   { id: '20', icon: '🏠', name: '私有网络', type: 'select', desc: '私有 IP、局域网的直连策略', color: 'green', filter: 'DIRECT',
     ruleSets: [['private', false], ['private-ip', true]] },
   { id: '21', icon: '🔒', name: '国内服务', type: 'select', desc: '针对国内 IP 和域名的直连策略', color: 'green', filter: 'DIRECT',
@@ -159,5 +161,5 @@ export const PROXY_GROUP_TEMPLATES: ProxyGroupTemplate[] = [
 ];
 
 export const getDefaultActiveGroups = () => {
-    return PROXY_GROUP_TEMPLATES.filter(g => ['1', '2', '23'].includes(g.id));
+    return PROXY_GROUP_TEMPLATES.filter(g => ['1', '2', '3', '6', '25', '23'].includes(g.id));
 }
