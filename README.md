@@ -17,7 +17,7 @@
 ## Docker 部署
 
 1. 配置 `.env`
-2. 下载docekr-compose.yml
+2. 下载 [docekr-compose.yml](https://github.com/rzh0504/ruley/blob/main/docker-compose.yml)
 3. 启动服务
 
 ```bash
