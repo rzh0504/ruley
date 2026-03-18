@@ -1,4 +1,6 @@
 # Ruley
+<img width="1921" height="1081" alt="image" src="https://github.com/user-attachments/assets/59624f88-cdab-4f90-bd12-5e483e9dab96" />
+
 
 一个用于解析订阅、整理节点规则并生成 `Clash` / `Mihomo` 配置的 Web 工具。
 
