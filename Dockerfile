@@ -16,8 +16,6 @@ FROM node:20-alpine AS runtime
 
 WORKDIR /app
 
-RUN apk add --no-cache su-exec
-
 ENV NODE_ENV=production
 ENV PORT=4000
 ENV NODE_OPTIONS=--max-old-space-size=256
@@ -31,16 +29,12 @@ COPY --from=builder --chown=node:node /app/node_modules/better-sqlite3/lib ./nod
 COPY --from=builder --chown=node:node /app/node_modules/better-sqlite3/build/Release ./node_modules/better-sqlite3/build/Release
 COPY --from=builder --chown=node:node /app/node_modules/bindings ./node_modules/bindings
 COPY --from=builder --chown=node:node /app/node_modules/file-uri-to-path ./node_modules/file-uri-to-path
-COPY --chown=root:root docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-RUN mkdir -p /app/data \
-    && chown -R node:node /app/data \
-    && chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN mkdir -p /app/data
 
 EXPOSE 4000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD node -e "fetch('http://127.0.0.1:4000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "server.cjs"]
