@@ -1,5 +1,5 @@
 import yaml from 'yaml';
-import { RULE_PROVIDERS, ProxyGroupTemplate } from '../../config/proxyTemplates.js';
+import { RULE_PROVIDERS } from '../../config/proxyTemplates.js';
 
 // ============================================================================
 // Types
@@ -27,7 +27,6 @@ export interface GenerateRequest {
   proxies: any[];
   proxyGroups: GroupConfig[];
   rules: RuleItem[];
-  platform?: 'clash' | 'mihomo';
   settings?: {
     port?: number;
     socksPort?: number;
@@ -35,6 +34,7 @@ export interface GenerateRequest {
     mode?: string;
     logLevel?: string;
     externalController?: string;
+    secret?: string;
     advancedDns?: boolean;
   };
 }
@@ -59,21 +59,17 @@ const matchProxies = (proxies: any[], filter: string): string[] => {
 };
 
 export const generateConfig = (req: GenerateRequest): string => {
-  const { proxies: rawProxies = [], proxyGroups = [], rules = [], settings = {}, platform = 'clash' } = req;
+  const { proxies: rawProxies = [], proxyGroups = [], rules = [], settings = {} } = req;
 
   const {
     port = 7897, allowLan = true, mode = 'rule', logLevel = 'info',
-    externalController = '127.0.0.1:9090', advancedDns = false
+    externalController = '', secret = 'set-your-secret', advancedDns = true
   } = settings;
 
-  // Filter proxies based on platform
-  // Clash Premium does not support vless, hysteria, hysteria2, tuic etc. natively.
-  const proxies = platform === 'mihomo' 
-    ? rawProxies 
-    : rawProxies.filter(p => !['vless', 'hysteria', 'hysteria2', 'tuic', 'wireguard'].includes(p.type));
+  const proxies = rawProxies;
 
   // --- Build proxy-groups ---
-  const clashProxyGroups: any[] = [];
+  const mihomoProxyGroups: any[] = [];
 
   const mainGroupName = proxyGroups.length > 0
     ? `${proxyGroups[0].icon} ${proxyGroups[0].name}` : '🚀 节点选择';
@@ -81,63 +77,74 @@ export const generateConfig = (req: GenerateRequest): string => {
   const autoGroup = proxyGroups.find(g => g.id === '2');
   const autoGroupName = autoGroup ? `${autoGroup.icon} ${autoGroup.name}` : null;
 
+  const addBaseChoices = (target: string[], groupId: string) => {
+    if (groupId !== '1') target.push(mainGroupName);
+    if (groupId !== '2' && autoGroupName) target.push(autoGroupName);
+    target.push('DIRECT');
+  };
+
   for (const group of proxyGroups) {
     const fullName = `${group.icon} ${group.name}`;
     const matched = matchProxies(proxies, group.filter);
     const groupProxies: string[] = [];
 
-    // Resolve actual type: '🚀 节点选择' and '⚡ 自动选择' are group references
     let actualType = group.type;
     if (actualType === '🚀 节点选择' || actualType === '⚡ 自动选择') {
-      // These are "use another group" types — implemented as select with the target group as sole proxy
       const targetGroupName = actualType === '🚀 节点选择' ? mainGroupName : (autoGroupName || mainGroupName);
       groupProxies.push(targetGroupName, 'DIRECT');
       actualType = 'select';
     } else if (actualType === 'reject') {
-      groupProxies.push('REJECT');
+      groupProxies.push('REJECT', 'DIRECT', mainGroupName);
+      if (autoGroupName) groupProxies.push(autoGroupName);
+      groupProxies.push(...matched);
       actualType = 'select';
     } else if (actualType === 'select') {
-      if (group.id === '1' || group.id === '24') {
+      if (group.id === '1') {
         if (autoGroupName) groupProxies.push(autoGroupName);
         groupProxies.push('DIRECT', 'REJECT', ...matched);
+      } else if (group.id === '2') {
+        groupProxies.push(...matched, 'DIRECT');
       } else if (group.id === '3') {
         groupProxies.push('REJECT', 'DIRECT', mainGroupName);
-      } else if (group.id === '20' || group.id === '21' || group.id === '25') {
-        groupProxies.push('DIRECT', 'REJECT', mainGroupName);
         if (autoGroupName) groupProxies.push(autoGroupName);
         groupProxies.push(...matched);
       } else {
-        groupProxies.push(mainGroupName);
-        if (autoGroupName) groupProxies.push(autoGroupName);
-        groupProxies.push('DIRECT', 'REJECT', ...matched);
+        addBaseChoices(groupProxies, group.id);
+        groupProxies.push('REJECT');
+        groupProxies.push(...matched);
       }
     } else {
-      groupProxies.push(...matched);
+      if (group.id === '2') {
+        groupProxies.push(...matched, 'DIRECT');
+      } else {
+        addBaseChoices(groupProxies, group.id);
+        groupProxies.push(...matched);
+      }
     }
 
     if (groupProxies.length === 0) groupProxies.push('DIRECT');
 
-    const clashGroup: any = {
+    const mihomoGroup: any = {
       name: fullName,
       type: actualType,
       proxies: [...new Set(groupProxies)],
     };
 
     if (actualType === 'url-test' || actualType === 'fallback') {
-      clashGroup.url = 'https://www.gstatic.com/generate_204';
-      clashGroup.interval = 300;
-      clashGroup.lazy = false;
+      mihomoGroup.url = 'https://www.gstatic.com/generate_204';
+      mihomoGroup.interval = 300;
+      mihomoGroup.lazy = false;
     }
 
     // Inject dialer-proxy for proxy chaining
     if (group.dialerProxy) {
       const dp = proxyGroups.find(g => g.id === group.dialerProxy);
       if (dp) {
-        clashGroup['dialer-proxy'] = `${dp.icon} ${dp.name}`;
+        mihomoGroup['dialer-proxy'] = `${dp.icon} ${dp.name}`;
       }
     }
 
-    clashProxyGroups.push(clashGroup);
+    mihomoProxyGroups.push(mihomoGroup);
   }
 
   // --- Collect rule-providers and RULE-SET rules from group templates ---
@@ -206,51 +213,68 @@ export const generateConfig = (req: GenerateRequest): string => {
     allRules.push(`MATCH,${catchAll ? `${catchAll.icon} ${catchAll.name}` : mainGroupName}`);
   }
 
-  // --- Full config ---
-  const config: any = {
-    'mixed-port': port,
-    'allow-lan': allowLan,
-    mode,
-    'log-level': logLevel,
-    'unified-delay': true,
-    'tcp-concurrent': true,
-    'find-process-mode': 'strict',
-    'external-controller': externalController,
-    dns: advancedDns ? {
-      enable: true, listen: '127.0.0.1:5335', 'enhanced-mode': 'fake-ip',
-      'fake-ip-range': '198.18.0.1/16',
-      'default-nameserver': ['114.114.114.114', '223.5.5.5', '8.8.8.8', '1.1.1.1'],
-      nameserver: ['https://dns.alidns.com/dns-query', 'https://doh.pub/dns-query', '114.114.114.114', '223.5.5.5'],
-      fallback: ['https://cloudflare-dns.com/dns-query', 'https://dns.google/dns-query', 'tls://8.8.8.8:853'],
-      'fallback-filter': { geoip: true, geoipcode: 'CN', ipcidr: ['240.0.0.0/4', '0.0.0.0/32'], domain: ['+.google.com', '+.facebook.com', '+.twitter.com', '+.youtube.com'] },
-    } : {
-      enable: true, listen: '127.0.0.1:5335', 'enhanced-mode': 'fake-ip',
-      'fake-ip-range': '198.18.0.1/16',
-      nameserver: ['114.114.114.114', '223.5.5.5', '8.8.8.8', '1.1.1.1']
+  const dnsConfig = advancedDns ? {
+    enable: true,
+    listen: '0.0.0.0:53',
+    ipv6: true,
+    'enhanced-mode': 'redir-host',
+    'fake-ip-range': '10.100.0.0/8',
+    nameserver: ['https://dns.alidns.com/dns-query', 'https://doh.pub/dns-query'],
+    fallback: ['https://1.0.0.1/dns-query', '8.8.8.8'],
+    'fallback-filter': {
+      geoip: true,
+      'geoip-code': 'CN',
+      ipcidr: ['240.0.0.0/4'],
+      domain: ['+.google.com', '+.facebook.com', '+.youtube.com'],
     },
-    profile: { 'store-selected': true, 'store-fake-ip': false },
-    sniffer: {
-      enable: true, 'parse-pure-ip': true,
-      sniff: { HTTP: { ports: [80, '8080-8880'], 'override-destination': true }, QUIC: { ports: [443, 8443] }, TLS: { ports: [443, 8443] } },
-    },
-    'geodata-mode': true, 'geo-auto-update': true, 'geodata-loader': 'standard', 'geo-update-interval': 24,
-    'geox-url': {
-      geoip: 'https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip.dat',
-      geosite: 'https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geosite.dat',
-      mmdb: 'https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/country.mmdb',
-    },
-    proxies,
-    'proxy-groups': clashProxyGroups,
+    'use-system-hosts': false,
+  } : {
+    enable: true,
+    listen: '0.0.0.0:53',
+    ipv6: true,
+    'enhanced-mode': 'redir-host',
+    'fake-ip-range': '10.100.0.0/8',
+    nameserver: ['https://dns.alidns.com/dns-query', 'https://doh.pub/dns-query'],
+    'use-system-hosts': false,
   };
 
-  // If using generic Clash, maybe remove some mihomo-specific features to avoid warnings
-  if (platform === 'clash') {
-      delete config['geodata-mode'];
-      delete config['geodata-loader'];
-      delete config['geox-url'];
-      delete config['geo-auto-update'];
-      delete config['geo-update-interval'];
-  }
+  // --- Full config ---
+  const config: any = {
+    mode,
+    'mixed-port': port,
+    'allow-lan': allowLan,
+    'log-level': logLevel,
+    ipv6: true,
+    'external-controller': externalController,
+    secret,
+    'unified-delay': true,
+    dns: dnsConfig,
+    'external-controller-pipe': '\\\\.\\pipe\\verge-mihomo',
+    'external-controller-cors': {
+      'allow-private-network': true,
+      'allow-origins': [
+        'tauri://localhost',
+        'http://tauri.localhost',
+        'https://yacd.metacubex.one',
+        'https://metacubex.github.io',
+        'https://board.zash.run.place',
+      ],
+    },
+    tun: {
+      'auto-detect-interface': true,
+      'auto-route': true,
+      device: 'Mihomo',
+      'dns-hijack': ['any:53'],
+      mtu: 1500,
+      'route-exclude-address': [],
+      stack: 'gvisor',
+      'strict-route': false,
+      enable: false,
+    },
+    profile: { 'store-selected': true, 'store-fake-ip': false },
+    proxies,
+    'proxy-groups': mihomoProxyGroups,
+  };
 
   if (Object.keys(usedProviders).length > 0) {
     config['rule-providers'] = usedProviders;

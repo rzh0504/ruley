@@ -264,7 +264,7 @@ export default function ConfigManager({ onLoadConfig }: ConfigManagerProps) {
                     </span>
                     <span className="flex items-center gap-1">
                       <span className="material-symbols-outlined text-[12px]">devices</span>
-                      {config.platform === 'mihomo' ? 'Mihomo' : 'Clash'}
+                      Mihomo
                     </span>
                     {config.cloud_token && (
                       <span className="flex items-center gap-1 text-[var(--color-primary)]">

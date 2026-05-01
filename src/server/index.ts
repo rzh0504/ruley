@@ -31,6 +31,38 @@ const buildAbsoluteUrl = (req: express.Request, subUrl: string) => {
 
 const createCloudToken = () => crypto.randomBytes(tokenBytes).toString('hex');
 
+const buildCurrentConfig = async ({
+  urls,
+  parsedNodes,
+  proxyGroups,
+  rules,
+  advancedDns,
+}: {
+  urls?: string;
+  parsedNodes?: unknown;
+  proxyGroups?: unknown;
+  rules?: unknown;
+  advancedDns?: boolean | number;
+}) => {
+  const proxies = Array.isArray(parsedNodes) && parsedNodes.length > 0
+    ? parsedNodes
+    : (await parseInput(urls || '')).proxies;
+  const groups = Array.isArray(proxyGroups) ? proxyGroups : [];
+  const ruleItems = Array.isArray(rules) ? rules : [];
+  const yamlStr = generateConfig({
+    proxies,
+    proxyGroups: groups as any,
+    rules: ruleItems as any,
+    settings: { advancedDns: advancedDns === true || advancedDns === 1 },
+  });
+
+  return {
+    yamlStr,
+    proxies,
+    nodeCount: proxies.length,
+  };
+};
+
 const getSafeFilename = (value?: unknown) =>
   getSubscriptionName(value).replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-');
 
@@ -107,7 +139,7 @@ app.post('/api/auth/login', authLimiter, handleLogin);
 // Public Routes (no auth needed)
 // ============================================================================
 
-// Subscription delivery endpoint (called by Clash clients)
+// Subscription delivery endpoint (called by Mihomo clients)
 app.get(['/api/sub/:token', '/api/sub/:token/:name'], subLimiter, async (req, res) => {
   const token = req.params.token;
   try {
@@ -116,17 +148,19 @@ app.get(['/api/sub/:token', '/api/sub/:token/:name'], subLimiter, async (req, re
       return res.status(404).send('Config not found.');
     }
 
-    let yamlStr = row.generated_config;
-    if (!yamlStr) {
-      const { proxies } = await parseInput(row.urls);
-      yamlStr = generateConfig({
-        proxies,
-        proxyGroups: JSON.parse(row.proxy_groups),
-        rules: JSON.parse(row.rules),
-        platform: row.platform as 'clash' | 'mihomo',
-        settings: { advancedDns: row.advanced_dns === 1 }
-      });
-    }
+    const proxyGroups = JSON.parse(row.proxy_groups);
+    const rules = JSON.parse(row.rules);
+    const { yamlStr, proxies } = await buildCurrentConfig({
+      urls: row.urls,
+      proxyGroups,
+      rules,
+      advancedDns: row.advanced_dns,
+    });
+
+    db.prepare(`
+      UPDATE configs SET generated_config = ?, parsed_nodes = ?, node_count = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(yamlStr, JSON.stringify(proxies), proxies.length, row.id);
 
     res.setHeader('Content-Type', 'text/yaml; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`${getSafeFilename(row.name)}.yaml`)}`);
@@ -176,7 +210,7 @@ app.post('/api/generate', heavyApiLimiter, authMiddleware, (req, res) => {
   }
 
   try {
-    const yamlStr = generateConfig({ proxies, proxyGroups: proxyGroups || [], rules: rules || [], settings: settings || {}, platform });
+    const yamlStr = generateConfig({ proxies, proxyGroups: proxyGroups || [], rules: rules || [], settings: settings || {} });
     res.json({ success: true, config: yamlStr });
   } catch (err: any) {
     console.error('[GEN] Error:', err);
@@ -202,26 +236,27 @@ app.get('/api/configs', authMiddleware, (req, res) => {
 });
 
 // Create config
-app.post('/api/configs', authMiddleware, (req, res) => {
+app.post('/api/configs', authMiddleware, async (req, res) => {
   const { name, urls, platform, advancedDns, proxyGroups, rules, nodeCount, parsedNodes, generatedConfig } = req.body;
   if (!name || !urls) {
     return res.status(400).json({ success: false, error: 'name and urls are required.' });
   }
 
   try {
+    const current = await buildCurrentConfig({ urls, parsedNodes, proxyGroups, rules, advancedDns });
     const result = db.prepare(`
       INSERT INTO configs (name, urls, platform, advanced_dns, proxy_groups, rules, node_count, parsed_nodes, generated_config)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       name,
       urls,
-      platform || 'clash',
+      'mihomo',
       advancedDns ? 1 : 0,
       JSON.stringify(proxyGroups || []),
       JSON.stringify(rules || []),
-      nodeCount || 0,
-      parsedNodes ? JSON.stringify(parsedNodes) : null,
-      generatedConfig || null
+      current.nodeCount,
+      JSON.stringify(current.proxies),
+      current.yamlStr
     );
 
     res.json({ 
@@ -250,14 +285,26 @@ app.get('/api/configs/:id', authMiddleware, (req, res) => {
 });
 
 // Update config
-app.put('/api/configs/:id', authMiddleware, (req, res) => {
+app.put('/api/configs/:id', authMiddleware, async (req, res) => {
   const { name, urls, platform, advancedDns, proxyGroups, rules, nodeCount, parsedNodes, generatedConfig } = req.body;
 
   try {
-    const existing = db.prepare('SELECT id FROM configs WHERE id = ?').get(req.params.id);
+    const existing = db.prepare('SELECT * FROM configs WHERE id = ?').get(req.params.id) as any;
     if (!existing) {
       return res.status(404).json({ success: false, error: '配置不存在' });
     }
+
+    const currentProxyGroups = proxyGroups ?? JSON.parse(existing.proxy_groups || '[]');
+    const currentRules = rules ?? JSON.parse(existing.rules || '[]');
+    const currentParsedNodes = parsedNodes ?? (existing.parsed_nodes ? JSON.parse(existing.parsed_nodes) : undefined);
+    const currentAdvancedDns = advancedDns !== undefined ? advancedDns : existing.advanced_dns;
+    const current = await buildCurrentConfig({
+      urls: urls ?? existing.urls,
+      parsedNodes: currentParsedNodes,
+      proxyGroups: currentProxyGroups,
+      rules: currentRules,
+      advancedDns: currentAdvancedDns,
+    });
 
     db.prepare(`
       UPDATE configs SET 
@@ -275,13 +322,13 @@ app.put('/api/configs/:id', authMiddleware, (req, res) => {
     `).run(
       name || null,
       urls || null,
-      platform || null,
+      'mihomo',
       advancedDns !== undefined ? (advancedDns ? 1 : 0) : null,
       proxyGroups ? JSON.stringify(proxyGroups) : null,
       rules ? JSON.stringify(rules) : null,
-      nodeCount !== undefined ? nodeCount : null,
-      parsedNodes ? JSON.stringify(parsedNodes) : null,
-      generatedConfig !== undefined ? generatedConfig : null,
+      current.nodeCount,
+      JSON.stringify(current.proxies),
+      current.yamlStr,
       req.params.id
     );
 
@@ -335,12 +382,13 @@ app.post('/api/configs/:id/cloud', authMiddleware, (req, res) => {
 // Legacy cloud-save (backwards compatibility, now creates a config record)
 // ============================================================================
 
-app.post('/api/cloud-save', authMiddleware, (req, res) => {
+app.post('/api/cloud-save', authMiddleware, async (req, res) => {
   const { urls, proxyGroups, rules, platform, advancedDns, parsedNodes, generatedConfig, nodeCount, configId, name, parentId } = req.body;
   if (!urls) return res.status(400).json({ success: false, error: 'urls is required' });
   const configName = getSubscriptionName(name);
 
   try {
+    const current = await buildCurrentConfig({ urls, parsedNodes, proxyGroups, rules, advancedDns });
     // Upsert: if configId is provided, update existing record
     if (configId) {
       const existing = db.prepare('SELECT * FROM configs WHERE id = ?').get(configId) as any;
@@ -355,11 +403,11 @@ app.post('/api/cloud-save', authMiddleware, (req, res) => {
           WHERE id = ?
         `).run(
           configName,
-          urls, platform || 'clash', advancedDns ? 1 : 0,
+          urls, 'mihomo', advancedDns ? 1 : 0,
           JSON.stringify(proxyGroups || []), JSON.stringify(rules || []),
-          nodeCount || 0,
-          parsedNodes ? JSON.stringify(parsedNodes) : null,
-          generatedConfig || null,
+          current.nodeCount,
+          JSON.stringify(current.proxies),
+          current.yamlStr,
           configId
         );
 
@@ -384,11 +432,11 @@ app.post('/api/cloud-save', authMiddleware, (req, res) => {
       INSERT INTO configs (name, urls, platform, advanced_dns, proxy_groups, rules, node_count, parsed_nodes, generated_config, cloud_token, cloud_url, parent_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      configName, urls, platform || 'clash', advancedDns ? 1 : 0,
+      configName, urls, 'mihomo', advancedDns ? 1 : 0,
       JSON.stringify(proxyGroups || []), JSON.stringify(rules || []),
-      nodeCount || 0,
-      parsedNodes ? JSON.stringify(parsedNodes) : null,
-      generatedConfig || null,
+      current.nodeCount,
+      JSON.stringify(current.proxies),
+      current.yamlStr,
       token, buildSubUrl(token, configName),
       parentId || null
     );

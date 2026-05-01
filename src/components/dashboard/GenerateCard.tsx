@@ -7,8 +7,6 @@ interface GenerateCardProps {
   isGenerating: boolean;
   hasConfig: boolean;
   nodesCount: number;
-  platform: "clash" | "mihomo";
-  onPlatformChange: (platform: "clash" | "mihomo") => void;
   advancedDns: boolean;
   onAdvancedDnsChange: (enabled: boolean) => void;
   onCloudSave: () => void;
@@ -25,8 +23,6 @@ export default function GenerateCard({
   isGenerating,
   hasConfig,
   nodesCount,
-  platform,
-  onPlatformChange,
   advancedDns,
   onAdvancedDnsChange,
   onCloudSave,
@@ -65,7 +61,7 @@ export default function GenerateCard({
             内核
           </div>
           <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
-            {platform === "mihomo" ? "Mihomo" : "Clash"}
+            Mihomo
           </div>
         </div>
         <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2">
@@ -100,34 +96,6 @@ export default function GenerateCard({
       </div>
 
       <div className="space-y-3">
-        <div className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 p-1">
-          <button
-            onClick={() => onPlatformChange("clash")}
-            className={`flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors ${
-              platform === "clash"
-                ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm"
-                : "text-slate-500 dark:text-slate-400"
-            }`}
-          >
-            <span className="material-symbols-outlined text-[13px]">
-              verified_user
-            </span>
-            Clash
-          </button>
-          <button
-            onClick={() => onPlatformChange("mihomo")}
-            className={`flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors ${
-              platform === "mihomo"
-                ? "bg-[var(--color-primary)]/15 text-slate-900 dark:text-[var(--color-primary)] shadow-sm"
-                : "text-slate-500 dark:text-slate-400"
-            }`}
-          >
-            <span className="material-symbols-outlined text-[13px]">
-              bolt
-            </span>
-            Mihomo
-          </button>
-        </div>
         <button
           onClick={onGenerate}
           disabled={isGenerating || nodesCount === 0}
@@ -208,24 +176,24 @@ export default function GenerateCard({
         </div>
 
         {cloudUrl && (
-          <div className="mt-3 rounded-lg border border-[var(--color-primary)]/30 bg-[var(--color-primary)]/10 p-3">
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <span className="text-xs font-bold text-[var(--color-primary)] flex items-center gap-1">
+          <div className="mt-3 max-w-full rounded-lg border border-[var(--color-primary)]/30 bg-[var(--color-primary)]/10 p-3">
+            <div className="mb-2 flex min-w-0 items-center justify-between gap-2">
+              <span className="flex min-w-0 items-center gap-1 text-xs font-bold text-[var(--color-primary)]">
                 <span className="material-symbols-outlined text-[14px]">
                   cloud_done
                 </span>{" "}
                 专属云端链接已生成
               </span>
-              <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+              <span className="shrink-0 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
                 名称：{resolvedName}
               </span>
             </div>
-            <div className="flex bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div className="flex min-w-0 max-w-full overflow-hidden rounded border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
               <input
                 type="text"
                 readOnly
                 value={cloudUrl}
-                className="flex-1 bg-transparent text-xs text-slate-600 dark:text-slate-300 px-2 py-1.5 outline-none font-mono"
+                className="min-w-0 flex-1 truncate bg-transparent px-2 py-1.5 font-mono text-xs text-slate-600 outline-none dark:text-slate-300"
               />
               <button
                 onClick={() => {

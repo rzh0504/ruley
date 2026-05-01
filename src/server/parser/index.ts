@@ -154,7 +154,7 @@ const runWithConcurrency = async <T, R>(items: T[], limit: number, worker: (item
 // ============================================================================
 
 /**
- * Parse a vmess:// link into a Clash proxy object.
+ * Parse a vmess:// link into a Mihomo proxy object.
  */
 export const parseVmess = (link: string): any => {
   try {
@@ -214,7 +214,7 @@ export const parseVmess = (link: string): any => {
 };
 
 /**
- * Parse a vless:// link into a Clash proxy object.
+ * Parse a vless:// link into a Mihomo proxy object.
  */
 export const parseVless = (link: string): any => {
   try {
@@ -281,7 +281,7 @@ export const parseVless = (link: string): any => {
 };
 
 /**
- * Parse a trojan:// link into a Clash proxy object.
+ * Parse a trojan:// link into a Mihomo proxy object.
  */
 export const parseTrojan = (link: string): any => {
   try {
@@ -324,7 +324,7 @@ export const parseTrojan = (link: string): any => {
 };
 
 /**
- * Parse a ss:// link (SIP002 and legacy) into a Clash proxy object.
+ * Parse a ss:// link (SIP002 and legacy) into a Mihomo proxy object.
  */
 export const parseShadowsocks = (link: string): any => {
   try {
@@ -417,7 +417,7 @@ export const parseShadowsocks = (link: string): any => {
 };
 
 /**
- * Parse a ssr:// link into a Clash proxy object.
+ * Parse a ssr:// link into a Mihomo proxy object.
  */
 export const parseShadowsocksR = (link: string): any => {
   try {
@@ -477,7 +477,7 @@ export const parseShadowsocksR = (link: string): any => {
 };
 
 /**
- * Parse a hysteria2:// or hy2:// link into a Clash proxy object.
+ * Parse a hysteria2:// or hy2:// link into a Mihomo proxy object.
  */
 export const parseHysteria2 = (link: string): any => {
   try {
@@ -512,7 +512,7 @@ export const parseHysteria2 = (link: string): any => {
 };
 
 /**
- * Parse a hysteria:// (v1) link into a Clash proxy object.
+ * Parse a hysteria:// (v1) link into a Mihomo proxy object.
  */
 export const parseHysteria = (link: string): any => {
   try {
@@ -549,7 +549,7 @@ export const parseHysteria = (link: string): any => {
 };
 
 /**
- * Parse a tuic:// link into a Clash proxy object.
+ * Parse a tuic:// link into a Mihomo proxy object.
  */
 export const parseTuic = (link: string): any => {
   try {
@@ -588,7 +588,7 @@ export const parseTuic = (link: string): any => {
 };
 
 /**
- * Parse a wireguard:// or wg:// link into a Clash proxy object.
+ * Parse a wireguard:// or wg:// link into a Mihomo proxy object.
  */
 export const parseWireGuard = (link: string): any => {
   try {
@@ -629,7 +629,7 @@ export const parseWireGuard = (link: string): any => {
 };
 
 /**
- * Parse a snell:// link into a Clash proxy object.
+ * Parse a snell:// link into a Mihomo proxy object.
  */
 export const parseSnell = (link: string): any => {
   try {
@@ -690,7 +690,7 @@ export const parseLineToProxy = (line: string): any | null => {
 // ============================================================================
 
 /**
- * Try to extract proxies from a YAML/Clash config string.
+ * Try to extract proxies from a YAML/Mihomo config string.
  * Returns null if the string is not valid YAML or doesn't contain proxies.
  */
 const tryParseYaml = (content: string): any[] | null => {
@@ -698,12 +698,12 @@ const tryParseYaml = (content: string): any[] | null => {
     const parsed = yaml.parse(content);
     if (!parsed || typeof parsed !== 'object') return null;
 
-    // Standard Clash format: { proxies: [...] }
+    // Standard Mihomo format: { proxies: [...] }
     if (parsed.proxies && Array.isArray(parsed.proxies)) {
       return parsed.proxies;
     }
 
-    // Legacy Clash format: { Proxy: [...] }
+    // Legacy format: { Proxy: [...] }
     if (parsed.Proxy && Array.isArray(parsed.Proxy)) {
       return parsed.Proxy;
     }
@@ -724,14 +724,14 @@ const tryParseYaml = (content: string): any[] | null => {
 // ============================================================================
 
 /**
- * Fetch a subscription URL and parse its contents into a list of Clash proxies.
+ * Fetch a subscription URL and parse its contents into a list of Mihomo proxies.
  */
 export const fetchAndParseSubscription = async (url: string): Promise<any[]> => {
   await assertSafeSubscriptionUrl(url);
 
   const response = await axios.get(url, {
     headers: {
-      'User-Agent': 'ClashforWindows/0.20.39',
+      'User-Agent': 'Mihomo/1.18.0',
     },
     timeout: SUBSCRIPTION_TIMEOUT_MS,
     responseType: 'arraybuffer',
@@ -751,7 +751,7 @@ export const fetchAndParseSubscription = async (url: string): Promise<any[]> => 
 
 /**
  * Parse raw text content that could be:
- * - YAML/Clash config
+ * - YAML/Mihomo config
  * - Base64-encoded subscription data
  * - Line-by-line proxy URIs
  */
@@ -808,7 +808,7 @@ const parseLinesAsProxies = (text: string): any[] => {
  * - Direct proxy URIs (vmess://, ss://, ssr://, etc.)
  * - Subscription HTTP(S) URLs
  * - Raw Base64-encoded subscription data
- * - Raw YAML/Clash config text
+ * - Raw YAML/Mihomo config text
  *
  * Returns { proxies, errors }.
  */

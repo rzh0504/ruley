@@ -95,7 +95,7 @@ export default function ConfigPreview({ config }: ConfigPreviewProps) {
           <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-2">
             <span className="material-symbols-outlined text-3xl opacity-20">code_off</span>
             <p className="text-sm">暂无配置</p>
-            <p className="text-[10px] text-center">添加节点并点击"立即生成配置"<br/>即可在此预览完整的 Clash 配置文件</p>
+            <p className="text-[10px] text-center">添加节点并点击"立即生成配置"<br/>即可在此预览完整的 Mihomo 配置文件</p>
           </div>
         )}
       </div>

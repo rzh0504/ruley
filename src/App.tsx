@@ -61,7 +61,6 @@ export default function App() {
   const [parsedNodes, setParsedNodes] = useState<any[]>([]);
   const [proxyGroups, setProxyGroups] = useState<ProxyGroupTemplate[]>(getDefaultActiveGroups);
   const [rules, setRules] = useState<RuleItem[]>([]);
-  const [targetPlatform, setTargetPlatform] = useState<'clash' | 'mihomo'>('clash');
   const [advancedDns, setAdvancedDns] = useState(true);
   const [subscriptionUrls, setSubscriptionUrls] = useState('');
   const [generatedConfig, setGeneratedConfig] = useState('');
@@ -102,7 +101,7 @@ export default function App() {
             dialerProxy: g.dialerProxy,
           })),
           rules: rules,
-          platform: targetPlatform,
+          platform: 'mihomo',
           settings: { advancedDns }
         }),
       });
@@ -119,7 +118,7 @@ export default function App() {
     } finally {
       setIsGenerating(false);
     }
-  }, [parsedNodes, proxyGroups, rules, targetPlatform, advancedDns]);
+  }, [parsedNodes, proxyGroups, rules, advancedDns]);
 
   // --- Cloud Save handler (upsert: update if currentConfigId exists, else create) ---
   const handleCloudSave = useCallback(async () => {
@@ -144,7 +143,7 @@ export default function App() {
             color: g.color, desc: g.desc, dialerProxy: g.dialerProxy,
           })),
           rules,
-          platform: targetPlatform,
+          platform: 'mihomo',
           advancedDns,
           parsedNodes,
           generatedConfig,
@@ -167,7 +166,7 @@ export default function App() {
     } finally {
       setIsSavingCloud(false);
     }
-  }, [subscriptionUrls, proxyGroups, rules, targetPlatform, advancedDns, parsedNodes, generatedConfig, currentConfigId, effectiveSubscriptionName]);
+  }, [subscriptionUrls, proxyGroups, rules, advancedDns, parsedNodes, generatedConfig, currentConfigId, effectiveSubscriptionName]);
 
   // --- Save as Branch (new config with same URLs, linked via parent_id) ---
   const handleSaveAsBranch = useCallback(async () => {
@@ -195,7 +194,7 @@ export default function App() {
             color: g.color, desc: g.desc, dialerProxy: g.dialerProxy,
           })),
           rules,
-          platform: targetPlatform,
+          platform: 'mihomo',
           advancedDns,
           parsedNodes,
           generatedConfig,
@@ -213,7 +212,7 @@ export default function App() {
     } finally {
       setIsSavingCloud(false);
     }
-  }, [subscriptionUrls, proxyGroups, rules, targetPlatform, advancedDns, parsedNodes, generatedConfig, currentConfigId]);
+  }, [subscriptionUrls, proxyGroups, rules, advancedDns, parsedNodes, generatedConfig, currentConfigId]);
 
   // --- Download YAML ---
   const handleDownload = useCallback(() => {
@@ -222,7 +221,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'clash-config.yaml';
+    a.download = 'mihomo-config.yaml';
     a.click();
     URL.revokeObjectURL(url);
   }, [generatedConfig]);
@@ -239,7 +238,6 @@ export default function App() {
     // Reset cloud URL first to prevent stale parent link from showing
     setCloudUrl('');
     setSubscriptionUrls(config.urls || '');
-    setTargetPlatform(config.platform || 'clash');
     setAdvancedDns(config.advanced_dns === 1);
     setCurrentConfigId(config.id);
     setCurrentConfigName(config.name || '');
@@ -263,7 +261,9 @@ export default function App() {
       const nodes = config.parsed_nodes ? JSON.parse(config.parsed_nodes) : [];
       setParsedNodes(nodes);
     } catch { setParsedNodes([]); }
-    setGeneratedConfig(config.generated_config || '');
+    setGeneratedConfig('');
+    // Generated config is intentionally not restored because saved previews may
+    // have been produced by an older template. Regenerate to preview/download.
     // Cloud URL is intentionally NOT restored here — it should only
     // appear after the user explicitly clicks "托管云端" or "更新云端"
     setActiveView('dashboard');
@@ -295,8 +295,6 @@ export default function App() {
             isGenerating={isGenerating}
             hasConfig={!!generatedConfig}
             nodesCount={parsedNodes.length}
-            platform={targetPlatform}
-            onPlatformChange={setTargetPlatform}
             advancedDns={advancedDns}
             onAdvancedDnsChange={setAdvancedDns}
             onCloudSave={handleCloudSave}

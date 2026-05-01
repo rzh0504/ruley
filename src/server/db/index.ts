@@ -27,7 +27,7 @@ export const initDb = () => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       urls TEXT NOT NULL,
-      platform TEXT NOT NULL DEFAULT 'clash',
+      platform TEXT NOT NULL DEFAULT 'mihomo',
       advanced_dns BOOLEAN DEFAULT 0,
       proxy_groups TEXT NOT NULL DEFAULT '[]',
       rules TEXT NOT NULL DEFAULT '[]',
