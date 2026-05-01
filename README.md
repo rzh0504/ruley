@@ -29,6 +29,8 @@ docker compose up -d
 默认访问地址：
 `http://localhost:4000`
 
+升级镜像后如果使用宿主机目录挂载 `./data:/app/data`，容器会在启动时自动修正 `/app/data` 权限，然后以非 root 用户运行服务，避免 SQLite 数据库只读导致启动失败。
+
 ## 环境变量
 
 | 变量                      | 说明                | 默认值       |
