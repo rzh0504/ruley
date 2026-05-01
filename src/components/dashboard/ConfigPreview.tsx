@@ -1,4 +1,5 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
+import { toast } from '../Toast';
 
 interface ConfigPreviewProps {
   config: string;
@@ -12,6 +13,8 @@ export default function ConfigPreview({ config }: ConfigPreviewProps) {
     navigator.clipboard.writeText(config).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {
+      toast('error', '复制失败，请手动选择内容复制');
     });
   }, [config]);
 
@@ -55,6 +58,9 @@ export default function ConfigPreview({ config }: ConfigPreviewProps) {
     });
   };
 
+  const highlightedConfig = useMemo(() => highlightYaml(config), [config]);
+  const lineCount = useMemo(() => config ? config.split('\n').length : 0, [config]);
+
   return (
     <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 md:col-span-4 lg:col-span-6 xl:col-span-4 row-span-2 flex flex-col overflow-hidden shadow-sm max-h-[600px]">
       <div className="p-3 flex justify-between items-center bg-slate-50 dark:bg-[#1e293b] border-b border-slate-200 dark:border-slate-700">
@@ -63,7 +69,7 @@ export default function ConfigPreview({ config }: ConfigPreviewProps) {
           配置预览
           {config && (
             <span className="text-[10px] font-mono text-slate-400 ml-1">
-              ({config.split('\n').length} 行)
+              ({lineCount} 行)
             </span>
           )}
         </h3>
@@ -82,7 +88,7 @@ export default function ConfigPreview({ config }: ConfigPreviewProps) {
         {config ? (
           <pre className="text-slate-700 dark:text-slate-300">
             <code className="block">
-              {highlightYaml(config)}
+              {highlightedConfig}
             </code>
           </pre>
         ) : (

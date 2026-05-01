@@ -16,8 +16,6 @@ export default function SubscriptionCard({
 }) {
   const [isValidating, setIsValidating] = useState(false);
   const [enableRename, setEnableRename] = useState(false);
-  const resolvedSubscriptionName = subscriptionName.trim() || 'ruley';
-  const subscriptionCount = urls.split('\n').map(line => line.trim()).filter(Boolean).length;
 
   const cleanNodeName = (name: string) => {
     if (!name) return name;
@@ -81,13 +79,9 @@ export default function SubscriptionCard({
           </h3>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">填写订阅名称与订阅链接，解析后直接生成配置或托管云端。</p>
         </div>
-        <div className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-          <span className="material-symbols-outlined text-[14px]">sell</span>
-          {resolvedSubscriptionName}
-        </div>
       </div>
       <div className="flex-1 p-4 flex flex-col overflow-hidden">
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_140px] gap-3 mb-3">
+        <div className="mb-3">
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1.5">订阅名称</label>
             <input
@@ -97,10 +91,6 @@ export default function SubscriptionCard({
               value={subscriptionName}
               onChange={(e) => onSubscriptionNameChange(e.target.value)}
             />
-          </div>
-          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2.5">
-            <div className="text-[11px] text-slate-500 dark:text-slate-400">链接数</div>
-            <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">{subscriptionCount}</div>
           </div>
         </div>
 

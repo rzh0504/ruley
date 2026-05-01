@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
 import path from 'path';
 import dotenv from 'dotenv';
@@ -12,6 +14,9 @@ dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 4000;
+const isProduction = process.env.NODE_ENV === 'production';
+const publicBaseUrl = process.env.PUBLIC_BASE_URL?.replace(/\/$/, '');
+const tokenBytes = 32;
 
 const getSubscriptionName = (value?: unknown) =>
   typeof value === 'string' && value.trim() ? value.trim() : 'ruley';
@@ -19,12 +24,69 @@ const getSubscriptionName = (value?: unknown) =>
 const buildSubUrl = (token: string, name?: unknown) =>
   `/api/sub/${token}/${encodeURIComponent(getSubscriptionName(name))}`;
 
+const buildAbsoluteUrl = (req: express.Request, subUrl: string) => {
+  if (publicBaseUrl) return `${publicBaseUrl}${subUrl}`;
+  return `${req.protocol}://${req.get('host')}${subUrl}`;
+};
+
+const createCloudToken = () => crypto.randomBytes(tokenBytes).toString('hex');
+
 const getSafeFilename = (value?: unknown) =>
   getSubscriptionName(value).replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-');
 
 // Middleware
-app.use(cors());
+if (process.env.TRUST_PROXY === 'true') {
+  app.set('trust proxy', 1);
+}
+
+const allowedOrigins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
+
+app.use(helmet({
+  contentSecurityPolicy: false,
+}));
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!isProduction || !origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error('CORS origin denied'));
+  },
+}));
 app.use(express.json({ limit: '5mb' }));
+app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err instanceof SyntaxError) {
+    return res.status(400).json({ success: false, error: '请求 JSON 格式无效' });
+  }
+  next(err);
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: '请求过于频繁，请稍后再试' },
+});
+
+const heavyApiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: '请求过于频繁，请稍后再试' },
+});
+
+const subLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many requests.',
+});
 
 // Initialize Database
 try {
@@ -39,14 +101,14 @@ try {
 // Auth Routes (public)
 // ============================================================================
 
-app.post('/api/auth/login', handleLogin);
+app.post('/api/auth/login', authLimiter, handleLogin);
 
 // ============================================================================
 // Public Routes (no auth needed)
 // ============================================================================
 
 // Subscription delivery endpoint (called by Clash clients)
-app.get(['/api/sub/:token', '/api/sub/:token/:name'], async (req, res) => {
+app.get(['/api/sub/:token', '/api/sub/:token/:name'], subLimiter, async (req, res) => {
   const token = req.params.token;
   try {
     const row = db.prepare('SELECT * FROM configs WHERE cloud_token = ?').get(token) as any;
@@ -54,21 +116,24 @@ app.get(['/api/sub/:token', '/api/sub/:token/:name'], async (req, res) => {
       return res.status(404).send('Config not found.');
     }
 
-    const { proxies } = await parseInput(row.urls);
-    const yamlStr = generateConfig({
-      proxies,
-      proxyGroups: JSON.parse(row.proxy_groups),
-      rules: JSON.parse(row.rules),
-      platform: row.platform as 'clash' | 'mihomo',
-      settings: { advancedDns: row.advanced_dns === 1 }
-    });
+    let yamlStr = row.generated_config;
+    if (!yamlStr) {
+      const { proxies } = await parseInput(row.urls);
+      yamlStr = generateConfig({
+        proxies,
+        proxyGroups: JSON.parse(row.proxy_groups),
+        rules: JSON.parse(row.rules),
+        platform: row.platform as 'clash' | 'mihomo',
+        settings: { advancedDns: row.advanced_dns === 1 }
+      });
+    }
 
     res.setHeader('Content-Type', 'text/yaml; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`${getSafeFilename(row.name)}.yaml`)}`);
     res.send(yamlStr);
   } catch (err: any) {
     console.error('[SUB] Generation error:', err);
-    res.status(500).send('Error generating config: ' + err.message);
+    res.status(500).send('Error generating config.');
   }
 });
 
@@ -84,7 +149,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth/me', authMiddleware, handleMe);
 
 // Parser & Generator (used by dashboard)
-app.post('/api/parse', authMiddleware, async (req, res) => {
+app.post('/api/parse', heavyApiLimiter, authMiddleware, async (req, res) => {
   const { urls } = req.body;
   if (!urls || typeof urls !== 'string') {
     return res.status(400).json({ success: false, error: '"urls" string is required.' });
@@ -99,11 +164,12 @@ app.post('/api/parse', authMiddleware, async (req, res) => {
       errors: result.errors.length > 0 ? result.errors : undefined,
     });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[PARSE] Error:', err);
+    res.status(500).json({ success: false, error: '解析失败' });
   }
 });
 
-app.post('/api/generate', authMiddleware, (req, res) => {
+app.post('/api/generate', heavyApiLimiter, authMiddleware, (req, res) => {
   const { proxies, proxyGroups, rules, settings, platform } = req.body;
   if (!proxies || !Array.isArray(proxies)) {
     return res.status(400).json({ success: false, error: 'proxies array is required.' });
@@ -114,7 +180,7 @@ app.post('/api/generate', authMiddleware, (req, res) => {
     res.json({ success: true, config: yamlStr });
   } catch (err: any) {
     console.error('[GEN] Error:', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: '生成失败' });
   }
 });
 
@@ -130,7 +196,8 @@ app.get('/api/configs', authMiddleware, (req, res) => {
     ).all();
     res.json({ success: true, configs: rows });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[CONFIGS] List error:', err);
+    res.status(500).json({ success: false, error: '配置列表加载失败' });
   }
 });
 
@@ -163,7 +230,8 @@ app.post('/api/configs', authMiddleware, (req, res) => {
       message: '配置已保存' 
     });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[CONFIGS] Create error:', err);
+    res.status(500).json({ success: false, error: '配置保存失败' });
   }
 });
 
@@ -176,7 +244,8 @@ app.get('/api/configs/:id', authMiddleware, (req, res) => {
     }
     res.json({ success: true, config: row });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[CONFIGS] Get error:', err);
+    res.status(500).json({ success: false, error: '配置加载失败' });
   }
 });
 
@@ -218,7 +287,8 @@ app.put('/api/configs/:id', authMiddleware, (req, res) => {
 
     res.json({ success: true, message: '配置已更新' });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[CONFIGS] Update error:', err);
+    res.status(500).json({ success: false, error: '配置更新失败' });
   }
 });
 
@@ -231,7 +301,8 @@ app.delete('/api/configs/:id', authMiddleware, (req, res) => {
     }
     res.json({ success: true, message: '配置已删除' });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[CONFIGS] Delete error:', err);
+    res.status(500).json({ success: false, error: '配置删除失败' });
   }
 });
 
@@ -246,16 +317,17 @@ app.post('/api/configs/:id/cloud', authMiddleware, (req, res) => {
     let token = row.cloud_token;
     if (!token) {
       // Generate new token
-      token = crypto.randomBytes(12).toString('hex');
+      token = createCloudToken();
       db.prepare('UPDATE configs SET cloud_token = ?, cloud_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
         .run(token, buildSubUrl(token, row.name), req.params.id);
     }
 
     const subUrl = buildSubUrl(token, row.name);
-    const cloudUrl = `${req.protocol}://${req.get('host')}${subUrl}`;
+    const cloudUrl = buildAbsoluteUrl(req, subUrl);
     res.json({ success: true, token, cloudUrl, subUrl });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[CLOUD] Generate error:', err);
+    res.status(500).json({ success: false, error: '云端链接生成失败' });
   }
 });
 
@@ -294,7 +366,7 @@ app.post('/api/cloud-save', authMiddleware, (req, res) => {
         // Generate cloud token if missing
         let token = existing.cloud_token;
         if (!token) {
-          token = crypto.randomBytes(12).toString('hex');
+          token = createCloudToken();
           db.prepare('UPDATE configs SET cloud_token = ?, cloud_url = ? WHERE id = ?')
             .run(token, buildSubUrl(token, configName), configId);
         }
@@ -307,7 +379,7 @@ app.post('/api/cloud-save', authMiddleware, (req, res) => {
     }
 
     // Create new record
-    const token = crypto.randomBytes(12).toString('hex');
+    const token = createCloudToken();
     const result = db.prepare(`
       INSERT INTO configs (name, urls, platform, advanced_dns, proxy_groups, rules, node_count, parsed_nodes, generated_config, cloud_token, cloud_url, parent_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -324,7 +396,7 @@ app.post('/api/cloud-save', authMiddleware, (req, res) => {
     res.json({ success: true, token, subUrl: buildSubUrl(token, configName), configId: result.lastInsertRowid });
   } catch (err: any) {
     console.error('[CLOUD] Save error:', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: '云端配置保存失败' });
   }
 });
 
@@ -335,6 +407,9 @@ app.post('/api/cloud-save', authMiddleware, (req, res) => {
 if (process.env.NODE_ENV === 'production') {
   const distPath = path.resolve(process.cwd(), 'dist');
   app.use(express.static(distPath));
+  app.use('/api', (req, res) => {
+    res.status(404).json({ success: false, error: 'API 不存在' });
+  });
   // SPA fallback: any non-API route serves index.html
   app.get('*', (req, res) => {
     res.sendFile(path.join(distPath, 'index.html'));

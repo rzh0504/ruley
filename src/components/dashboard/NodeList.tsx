@@ -43,7 +43,7 @@ export default function NodeList({ nodes = [] }: { nodes?: any[] }) {
         ) : (
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
             {filteredNodes.map((node, index) => (
-              <li key={index} className="flex items-center justify-between p-3 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+              <li key={`${node.type || 'node'}:${node.server || 'unknown'}:${node.port || index}:${node.name || index}`} className="flex items-center justify-between p-3 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                 <div className="flex items-center gap-3 overflow-hidden">
                   <div className="flex items-center justify-center size-8 rounded bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 flex-shrink-0">
                     <span className="material-symbols-outlined text-[16px]">dns</span>

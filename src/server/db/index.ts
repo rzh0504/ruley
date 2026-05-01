@@ -16,6 +16,8 @@ const db = new Database(dbPath, {
 
 // Enable WAL mode for better performance
 db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 5000');
 
 // Initialize tables
 export const initDb = () => {
@@ -38,6 +40,11 @@ export const initDb = () => {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_configs_parent_id ON configs(parent_id);
+    CREATE INDEX IF NOT EXISTS idx_configs_cloud_token ON configs(cloud_token);
   `);
 
   // Add columns if missing (for existing databases)

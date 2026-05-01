@@ -11,4 +11,14 @@ services:
     env_file:
       - .env
     environment:
-      - NODE_ENV=production
+      NODE_ENV: production
+      NODE_OPTIONS: "--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE:-256}"
+      CORS_ORIGIN: "${CORS_ORIGIN:-}"
+      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-}"
+    mem_limit: "${MEM_LIMIT:-512m}"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

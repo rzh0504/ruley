@@ -35,6 +35,14 @@ docker compose up -d
 | ------------------------- | ------------------- | ------------ |
 | `ADMIN_PASSWORD`          | 后台登录密码        | 无，必须设置 |
 | `JWT_SECRET`              | JWT 签名密钥        | 无，必须设置 |
+| `CORS_ORIGIN`             | 生产环境允许访问 API 的前端 Origin，多个用逗号分隔 | 空 |
+| `PUBLIC_BASE_URL`         | 生成公开订阅链接时使用的外部访问地址 | 自动从请求推断 |
+| `TRUST_PROXY`             | 位于反向代理后方时启用可信代理解析 | `false` |
+| `ALLOW_HTTP_SUBSCRIPTIONS` | 是否允许抓取非 HTTPS 订阅链接 | `false` |
+| `MAX_SUBSCRIPTION_URLS`   | 单次解析允许的订阅 URL 数量上限 | `10` |
+| `MAX_SUBSCRIPTION_BYTES`  | 单个订阅响应体大小上限 | `5242880` |
+| `SUBSCRIPTION_TIMEOUT_MS` | 单个订阅请求超时时间 | `15000` |
+| `SUBSCRIPTION_CONCURRENCY` | 订阅抓取并发数 | `4` |
 | `PORT`                    | 服务端口            | `4000`       |
 | `NODE_ENV`                | 运行环境            | `production` |
 | `NODE_MAX_OLD_SPACE_SIZE` | Node 内存限制       | `256`        |
