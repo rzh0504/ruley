@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { PROXY_GROUP_TEMPLATES, ProxyGroupTemplate, getDefaultRuleLinks } from '../../config/proxyTemplates';
 
 interface ProxyGroupManagerProps {
@@ -20,6 +20,13 @@ export default function ProxyGroupManager({ parsedNodes, activeGroups, onGroupsC
   const [newGroupFilter, setNewGroupFilter] = useState('^(.*)$');
   const [newGroupRuleLinks, setNewGroupRuleLinks] = useState('');
   const [newGroupDialerProxy, setNewGroupDialerProxy] = useState('');
+
+  useEffect(() => {
+    setSelectedGroup(current => {
+      if (!current) return activeGroups[0] || null;
+      return activeGroups.find(group => group.id === current.id) || activeGroups[0] || null;
+    });
+  }, [activeGroups]);
 
   const isPreset = selectedGroup ? PROXY_GROUP_TEMPLATES.some(t => t.id === selectedGroup.id) : false;
   const isUnlocked = selectedGroup ? (!isPreset || unlockedGroups[selectedGroup.id]) : false;
@@ -90,20 +97,6 @@ export default function ProxyGroupManager({ parsedNodes, activeGroups, onGroupsC
       updateSelectedGroup({ filter: combined });
     }
   };
-
-  // Count matched nodes per group
-  const matchCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const group of activeGroups) {
-      try {
-        const regex = new RegExp(group.filter, 'i');
-        counts[group.id] = parsedNodes.filter(n => n.name && regex.test(n.name)).length;
-      } catch {
-        counts[group.id] = parsedNodes.filter(n => n.name && n.name.toLowerCase().includes(group.filter.toLowerCase())).length;
-      }
-    }
-    return counts;
-  }, [activeGroups, parsedNodes]);
 
   const toggleGroupActive = (template: ProxyGroupTemplate) => {
     const isAlreadyActive = activeGroups.some(g => g.id === template.id);

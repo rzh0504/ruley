@@ -45,6 +45,10 @@ export interface GenerateRequest {
 
 const matchProxies = (proxies: any[], filter: string): string[] => {
   if (!filter || !proxies.length) return [];
+  if (filter.length > 120 || /\([^)]*[+*][^)]*\)[+*?{]/.test(filter)) {
+    const lower = filter.toLowerCase();
+    return proxies.filter(p => p.name && p.name.toLowerCase().includes(lower)).map(p => p.name);
+  }
   try {
     const regex = new RegExp(filter, 'i');
     return proxies.filter(p => p.name && regex.test(p.name)).map(p => p.name);
@@ -79,7 +83,6 @@ export const generateConfig = (req: GenerateRequest): string => {
 
   for (const group of proxyGroups) {
     const fullName = `${group.icon} ${group.name}`;
-    console.log('[GEN] proxy-group:', group.id, '→', fullName, 'type:', group.type);
     const matched = matchProxies(proxies, group.filter);
     const groupProxies: string[] = [];
 

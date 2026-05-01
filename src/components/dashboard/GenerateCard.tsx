@@ -37,32 +37,17 @@ export default function GenerateCard({
   currentConfigId,
 }: GenerateCardProps) {
   const resolvedName = currentConfigName?.trim() || "ruley";
-  const displayName = currentConfigName?.trim() || resolvedName;
 
   return (
     <div className="rounded-xl bg-white dark:bg-[var(--color-card-dark)] shadow-sm border border-slate-200 dark:border-slate-700 md:col-span-1 lg:col-span-2 xl:col-span-3 row-span-2 flex h-[480px] flex-col p-5">
-      <div className="flex items-start justify-between gap-3 mb-4">
+      <div className="flex items-start gap-3 mb-4">
         <div className="flex shrink-0 items-start gap-3">
-          <div className="flex items-center justify-center size-10 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-[var(--color-primary)]">
-            <span className="material-symbols-outlined">rocket_launch</span>
-          </div>
+          <span className="material-symbols-outlined text-[26px] text-[var(--color-primary)]">rocket_launch</span>
           <div>
             <h3 className="whitespace-nowrap text-base font-bold text-slate-900 dark:text-white">
               生成配置
             </h3>
           </div>
-        </div>
-        <div
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold ${
-            currentConfigId
-              ? "bg-slate-900 dark:bg-[var(--color-primary)] text-white dark:text-black"
-              : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
-          }`}
-        >
-          <span className="material-symbols-outlined text-[14px]">
-            {currentConfigId ? "edit_document" : "sell"}
-          </span>
-          <span className="truncate max-w-[120px]">{displayName}</span>
         </div>
       </div>
 
