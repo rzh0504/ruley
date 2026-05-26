@@ -1,7 +1,11 @@
 node_modules/
+.next/
+.next-dev/
 dist/
 data/
 .git/
+.github/
+.agents/
 .gitignore
 .env
 .env.*
@@ -9,3 +13,8 @@ data/
 *.log
 .vscode/
 .DS_Store
+coverage/
+tsconfig.tsbuildinfo
+server.cjs
+docker-compose*.yml
+README.md

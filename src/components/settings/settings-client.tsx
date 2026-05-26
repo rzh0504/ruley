@@ -210,7 +210,7 @@ export function SettingsClient() {
   const [proxyGroupPreferences, setProxyGroupPreferences] =
     useState<ProxyGroupPreferences>(defaultProxyGroupPreferences);
   const [activeSection, setActiveSection] =
-    useState<SettingsSectionId>("defaults");
+    useState<SettingsSectionId>("appearance");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
