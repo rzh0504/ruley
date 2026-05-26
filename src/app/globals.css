@@ -347,3 +347,60 @@ body {
     @apply font-sans font-mono;
   }
 }
+
+.yaml-highlight {
+  color: var(--code-foreground);
+  line-height: 1.45;
+  white-space: pre;
+}
+
+.yaml-highlight-line {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  min-width: max-content;
+}
+
+.yaml-highlight-line-number {
+  color: var(--muted-foreground);
+  padding-right: 0.375rem;
+  text-align: right;
+  user-select: none;
+}
+
+.yaml-highlight-line-code {
+  min-width: 0;
+}
+
+.yaml-collapse {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows 180ms ease,
+    opacity 140ms ease;
+}
+
+.yaml-collapse[data-collapsed="true"] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
+.yaml-highlight .hljs-attr,
+.yaml-highlight .hljs-attribute {
+  color: var(--info-foreground);
+}
+
+.yaml-highlight .hljs-string,
+.yaml-highlight .hljs-number,
+.yaml-highlight .hljs-literal {
+  color: var(--success-foreground);
+}
+
+.yaml-highlight .hljs-comment {
+  color: var(--muted-foreground);
+}
+
+.yaml-highlight .hljs-meta,
+.yaml-highlight .hljs-bullet {
+  color: var(--warning-foreground);
+}

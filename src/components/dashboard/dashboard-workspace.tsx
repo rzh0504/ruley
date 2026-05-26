@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
+import hljs from "highlight.js/lib/core";
+import yamlLanguage from "highlight.js/lib/languages/yaml";
 import {
   AlertTriangleIcon,
   ArrowDownIcon,
@@ -58,6 +60,8 @@ import {
   type SubscriptionSource,
 } from "@/lib/subscription-sources";
 
+hljs.registerLanguage("yaml", yamlLanguage);
+
 type RuleItem = { id: string; type: string; value: string; policy: string };
 type ParseErrorRecord = { url?: string; input?: string; error?: string };
 type ParseDiagnostic = {
@@ -81,6 +85,7 @@ type YamlBlock = {
   key: string;
   label: string;
   content: string;
+  startLine: number;
   count: number;
   foldable: boolean;
 };
@@ -132,6 +137,7 @@ const ruleTypes = [
 const yamlFoldableSections = new Map([
   ["proxies", "proxies"],
   ["proxy-groups", "proxy-groups"],
+  ["rule-providers", "rule-providers"],
   ["rules", "rules"],
 ]);
 
@@ -185,6 +191,11 @@ const matchNodesByFilter = (
   }
 };
 
+const isBuiltInPolicyFilter = (filter: string) => {
+  const normalized = filter.replace(/\s/g, "").toUpperCase();
+  return normalized === "DIRECT" || normalized === "REJECT" || normalized === "(REJECT|DIRECT)" || normalized === "(DIRECT|REJECT)";
+};
+
 const validateWorkspace = ({
   nodes,
   groups,
@@ -222,6 +233,7 @@ const validateWorkspace = ({
     } else if (
       nodes.length > 0 &&
       (group.policyOptions || []).includes("matched") &&
+      !isBuiltInPolicyFilter(group.filter || "") &&
       matched.length === 0
     ) {
       issues.push({
@@ -254,6 +266,7 @@ const getYamlBlocks = (yamlText: string): YamlBlock[] => {
   const blocks: YamlBlock[] = [];
   let currentKey = "root";
   let currentLines: string[] = [];
+  let currentStartLine = 1;
 
   const pushCurrent = () => {
     if (currentLines.length === 0) return;
@@ -262,17 +275,19 @@ const getYamlBlocks = (yamlText: string): YamlBlock[] => {
       key: currentKey,
       label: yamlFoldableSections.get(currentKey) || currentKey,
       content: currentLines.join("\n"),
+      startLine: currentStartLine,
       count: currentLines.filter((line) => /^\s*-\s/.test(line)).length,
       foldable,
     });
   };
 
-  for (const line of lines) {
+  for (const [index, line] of lines.entries()) {
     const topLevel = line.match(/^([A-Za-z0-9_-]+):/);
     if (topLevel) {
       pushCurrent();
       currentKey = topLevel[1];
       currentLines = [line];
+      currentStartLine = index + 1;
     } else {
       currentLines.push(line);
     }
@@ -312,42 +327,34 @@ const parseRuleLine = (
 
 function HighlightedYaml({
   content,
+  startLine = 1,
   compact = false,
 }: {
   content: string;
+  startLine?: number;
   compact?: boolean;
 }) {
+  const highlighted = hljs.highlight(content, {
+    language: "yaml",
+    ignoreIllegals: true,
+  }).value;
+  const highlightedLines = highlighted.split("\n");
+
   return (
-    <pre className={`overflow-auto p-3 font-mono ${compact ? "max-h-96" : ""}`}>
-      {content.split("\n").map((line, index) => {
-        const keyMatch = line.match(/^(\s*)([A-Za-z0-9_-]+):(.*)$/);
-        const listMatch = line.match(/^(\s*-\s)([A-Za-z0-9_-]+):(.*)$/);
-        if (listMatch) {
-          return (
-            <div key={`${line}-${index}`}>
-              <span className="text-muted-foreground">{listMatch[1]}</span>
-              <span className="text-info-foreground">{listMatch[2]}</span>
-              <span className="text-muted-foreground">:</span>
-              <span className="text-foreground">{listMatch[3]}</span>
-            </div>
-          );
-        }
-        if (keyMatch) {
-          return (
-            <div key={`${line}-${index}`}>
-              <span>{keyMatch[1]}</span>
-              <span className="text-info-foreground">{keyMatch[2]}</span>
-              <span className="text-muted-foreground">:</span>
-              <span className="text-foreground">{keyMatch[3]}</span>
-            </div>
-          );
-        }
-        return (
-          <div key={`${line}-${index}`} className="text-muted-foreground">
-            {line || " "}
-          </div>
-        );
-      })}
+    <pre
+      className={`yaml-highlight overflow-auto font-mono ${compact ? "max-h-96 py-3 pr-3 pl-1" : "py-0 pr-2 pl-1"}`}
+    >
+      <code>
+        {highlightedLines.map((line, index) => (
+          <span className="yaml-highlight-line" key={`${startLine + index}-${line}`}>
+            <span className="yaml-highlight-line-number">{startLine + index}</span>
+            <span
+              className="yaml-highlight-line-code"
+              dangerouslySetInnerHTML={{ __html: line || " " }}
+            />
+          </span>
+        ))}
+      </code>
     </pre>
   );
 }
@@ -882,7 +889,7 @@ export function DashboardWorkspace() {
           </div>
         </section>
 
-        <div className="grid items-stretch gap-6 xl:grid-cols-[1.05fr_1fr]">
+        <div className="grid items-stretch gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
           <Card className="h-128 min-h-0">
             <CardHeader className="gap-3 md:grid-cols-[1fr_auto]">
               <div className="flex flex-col gap-1">
@@ -1115,7 +1122,7 @@ export function DashboardWorkspace() {
                     诊断与校验
                   </div>
                   {validationIssues.length > 0 && (
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-0">
                       <div className="text-muted-foreground text-xs">
                         生成前校验
                       </div>
@@ -1193,7 +1200,7 @@ export function DashboardWorkspace() {
             </CardContent>
           </Card>
 
-          <div className="min-h-0">
+          <div className="min-h-0 min-w-0">
             <Card className="h-128 min-h-0">
               <CardHeader className="gap-3 md:grid-cols-[1fr_auto]">
                 <div className="flex flex-col gap-1">
@@ -1223,45 +1230,59 @@ export function DashboardWorkspace() {
                     </Button>
                   </div>
                 )}
-                <div className="min-h-0 flex-1 overflow-auto rounded-xl bg-muted p-3 text-xs leading-relaxed">
+                <div className="min-h-0 max-h-full flex-1 overflow-auto rounded-xl bg-muted p-3 text-xs leading-relaxed">
                   {generatedConfig ? (
                     <div className="flex flex-col gap-2">
                       {yamlBlocks.map((block) => {
                         const collapsed = collapsedYamlSections.has(block.key);
+                        if (!block.foldable) {
+                          return (
+                            <HighlightedYaml
+                              key={block.key}
+                              content={block.content}
+                              startLine={block.startLine}
+                            />
+                          );
+                        }
+
                         return (
                           <section
                             key={block.key}
-                            className="rounded-lg border bg-background/72"
+                            className="my-1 rounded-lg border bg-background/72 first:mt-0 last:mb-0"
                           >
-                            {block.foldable ? (
-                              <button
-                                type="button"
-                                onClick={() => toggleYamlSection(block.key)}
-                                className="flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left"
-                              >
-                                <span className="flex items-center gap-2 font-medium">
-                                  {collapsed ? (
-                                    <ChevronRightIcon
-                                      className="size-4"
-                                      aria-hidden="true"
-                                    />
-                                  ) : (
-                                    <ChevronDownIcon
-                                      className="size-4"
-                                      aria-hidden="true"
-                                    />
-                                  )}
-                                  {block.label}
-                                </span>
-                                <Badge variant="outline">{block.count}</Badge>
-                              </button>
-                            ) : null}
-                            {!collapsed && (
-                              <HighlightedYaml
-                                content={block.content}
-                                compact={block.foldable}
-                              />
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => toggleYamlSection(block.key)}
+                              className="flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left"
+                            >
+                              <span className="flex items-center gap-2 font-medium">
+                                {collapsed ? (
+                                  <ChevronRightIcon
+                                    className="size-4"
+                                    aria-hidden="true"
+                                  />
+                                ) : (
+                                  <ChevronDownIcon
+                                    className="size-4"
+                                    aria-hidden="true"
+                                  />
+                                )}
+                                {block.label}
+                              </span>
+                              <Badge variant="outline">{block.count}</Badge>
+                            </button>
+                            <div
+                              className="yaml-collapse"
+                              data-collapsed={collapsed ? "true" : "false"}
+                            >
+                              <div className="min-h-0 overflow-hidden">
+                                <HighlightedYaml
+                                  content={block.content}
+                                  startLine={block.startLine}
+                                  compact={block.foldable}
+                                />
+                              </div>
+                            </div>
                           </section>
                         );
                       })}
