@@ -2,6 +2,7 @@
   "name": "ruley",
   "private": true,
   "version": "0.0.0",
+  "packageManager": "pnpm@10.31.0",
   "scripts": {
     "dev": "cross-env NEXT_DIST_DIR=.next-dev next dev --webpack",
     "build": "next build",
