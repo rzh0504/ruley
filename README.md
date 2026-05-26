@@ -182,3 +182,5 @@ pnpm dev
 pnpm db:migrate
 pnpm dev
 ```
+
+感谢 [linux.do](https://linux.do) 提供社区支持和 AI 工具支持!
