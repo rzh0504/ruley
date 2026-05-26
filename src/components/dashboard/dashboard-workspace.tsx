@@ -15,6 +15,7 @@ import {
   PlusIcon,
   RefreshCwIcon,
   SaveIcon,
+  SettingsIcon,
   Trash2Icon,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
@@ -67,6 +68,15 @@ type ValidationIssue = {
   severity: "error" | "warning";
   message: string;
 };
+type SourcePreviewState = {
+  sourceId: string;
+  cacheKey: string;
+  loading: boolean;
+  nodes: Record<string, unknown>[];
+  errors: ParseErrorRecord[];
+  diagnostics: ParseDiagnostic[];
+  cached: boolean;
+};
 type YamlBlock = {
   key: string;
   label: string;
@@ -78,10 +88,21 @@ type ConfigRecord = {
   id: number;
   name: string;
   urls: string;
-  advancedDns: boolean;
+  settings?: Partial<AdvancedSettings> | null;
   proxyGroups: ProxyGroupTemplate[];
   rules: RuleItem[];
   parsedNodes?: Record<string, unknown>[] | null;
+};
+
+type AdvancedSettings = {
+  port: number;
+  socksPort: number;
+  allowLan: boolean;
+  mode: string;
+  logLevel: string;
+  externalController: string;
+  secret: string;
+  advancedDns: boolean;
 };
 
 const defaultGroups = () =>
@@ -114,6 +135,32 @@ const yamlFoldableSections = new Map([
   ["rules", "rules"],
 ]);
 
+const defaultAdvancedSettings: AdvancedSettings = {
+  port: 7897,
+  socksPort: 0,
+  allowLan: true,
+  mode: "rule",
+  logLevel: "info",
+  externalController: "",
+  secret: "set-your-secret",
+  advancedDns: true,
+};
+
+const normalizeAdvancedSettings = (
+  settings?: Partial<AdvancedSettings> | null,
+): AdvancedSettings => ({
+  ...defaultAdvancedSettings,
+  ...settings,
+  advancedDns: typeof settings?.advancedDns === "boolean" ? settings.advancedDns : defaultAdvancedSettings.advancedDns,
+  port: Number(settings?.port || defaultAdvancedSettings.port),
+  socksPort: Number(settings?.socksPort || defaultAdvancedSettings.socksPort),
+});
+
+const serializeAdvancedSettings = (settings: AdvancedSettings) => ({
+  ...settings,
+  socksPort: settings.socksPort > 0 ? settings.socksPort : undefined,
+});
+
 const isComplexRegex = (value: string) =>
   value.length > 120 || /\([^)]*[+*][^)]*\)[+*?{]/.test(value);
 
@@ -125,7 +172,9 @@ const matchNodesByFilter = (
   if (isComplexRegex(filter)) {
     const lower = filter.toLowerCase();
     return nodes.filter((node) =>
-      String(node.name || "").toLowerCase().includes(lower),
+      String(node.name || "")
+        .toLowerCase()
+        .includes(lower),
     );
   }
   try {
@@ -233,8 +282,14 @@ const getYamlBlocks = (yamlText: string): YamlBlock[] => {
   return blocks.filter((block) => block.content.trim());
 };
 
-const parseRuleLine = (line: string, fallbackPolicy: string): RuleItem | null => {
-  const parts = line.split(",").map((part) => part.trim()).filter(Boolean);
+const parseRuleLine = (
+  line: string,
+  fallbackPolicy: string,
+): RuleItem | null => {
+  const parts = line
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
   if (parts.length < 2) return null;
   const [type, valueOrPolicy, policy] = parts;
   if (!ruleTypes.includes(type)) return null;
@@ -297,6 +352,142 @@ function HighlightedYaml({
   );
 }
 
+function AdvancedSettingsDialog({
+  settings,
+  onChange,
+}: {
+  settings: AdvancedSettings;
+  onChange: (updates: Partial<AdvancedSettings>) => void;
+}) {
+  return (
+    <Dialog>
+      <DialogTrigger render={<Button variant="outline" size="sm" />}>
+        <SettingsIcon aria-hidden="true" />
+        高级配置
+      </DialogTrigger>
+      <DialogPopup className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>高级配置</DialogTitle>
+          <DialogDescription>
+            这些设置会写入生成的 Mihomo YAML，并随配置一起保存。
+          </DialogDescription>
+        </DialogHeader>
+        <DialogPanel>
+          <div className="grid gap-4">
+            <div className="flex items-center justify-between gap-3 rounded-xl border p-3">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium">高级防泄漏 DNS</span>
+                <span className="text-muted-foreground text-sm">
+                  启用更稳妥的 DNS fallback 与过滤配置
+                </span>
+              </div>
+              <Switch
+                checked={settings.advancedDns}
+                onCheckedChange={(advancedDns) => onChange({ advancedDns })}
+              />
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="flex flex-col gap-2 text-sm font-medium">
+                Mixed Port
+                <Input
+                  nativeInput
+                  type="number"
+                  value={settings.port}
+                  onChange={(event) =>
+                    onChange({
+                      port: Number(event.target.value || defaultAdvancedSettings.port),
+                    })
+                  }
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-medium">
+                Socks Port
+                <Input
+                  nativeInput
+                  type="number"
+                  value={settings.socksPort}
+                  onChange={(event) =>
+                    onChange({ socksPort: Number(event.target.value || 0) })
+                  }
+                  placeholder="0 表示不写入"
+                />
+              </label>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="flex flex-col gap-2 text-sm font-medium">
+                Mode
+                <StringSelect
+                  items={[
+                    { label: "rule", value: "rule" },
+                    { label: "global", value: "global" },
+                    { label: "direct", value: "direct" },
+                  ]}
+                  value={settings.mode}
+                  onChange={(mode) => onChange({ mode })}
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-medium">
+                Log Level
+                <StringSelect
+                  items={[
+                    { label: "silent", value: "silent" },
+                    { label: "error", value: "error" },
+                    { label: "warning", value: "warning" },
+                    { label: "info", value: "info" },
+                    { label: "debug", value: "debug" },
+                  ]}
+                  value={settings.logLevel}
+                  onChange={(logLevel) => onChange({ logLevel })}
+                />
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 rounded-xl border p-3">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium">Allow LAN</span>
+                <span className="text-muted-foreground text-sm">
+                  允许局域网设备连接本机代理端口
+                </span>
+              </div>
+              <Switch
+                checked={settings.allowLan}
+                onCheckedChange={(allowLan) => onChange({ allowLan })}
+              />
+            </div>
+
+            <label className="flex flex-col gap-2 text-sm font-medium">
+              External Controller
+              <Input
+                nativeInput
+                value={settings.externalController}
+                onChange={(event) =>
+                  onChange({ externalController: event.target.value })
+                }
+                placeholder="127.0.0.1:9090"
+              />
+            </label>
+
+            <label className="flex flex-col gap-2 text-sm font-medium">
+              Secret
+              <Input
+                nativeInput
+                value={settings.secret}
+                onChange={(event) => onChange({ secret: event.target.value })}
+                placeholder="set-your-secret"
+              />
+            </label>
+          </div>
+        </DialogPanel>
+        <DialogFooter>
+          <DialogClose render={<Button />}>完成</DialogClose>
+        </DialogFooter>
+      </DialogPopup>
+    </Dialog>
+  );
+}
+
 export function DashboardWorkspace() {
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -306,15 +497,29 @@ export function DashboardWorkspace() {
   const [nodes, setNodes] = useState<Record<string, unknown>[]>([]);
   const [groups, setGroups] = useState<ProxyGroupTemplate[]>(defaultGroups);
   const [rules, setRules] = useState<RuleItem[]>([]);
-  const [advancedDns, setAdvancedDns] = useState(true);
+  const [advancedSettings, setAdvancedSettings] = useState<AdvancedSettings>(
+    defaultAdvancedSettings,
+  );
   const [generatedConfig, setGeneratedConfig] = useState("");
   const [cloudUrl, setCloudUrl] = useState("");
   const [currentConfigId, setCurrentConfigId] = useState<number | null>(null);
   const [parseErrors, setParseErrors] = useState<ParseErrorRecord[]>([]);
-  const [parseDiagnostics, setParseDiagnostics] = useState<ParseDiagnostic[]>([]);
-  const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
-  const [collapsedYamlSections, setCollapsedYamlSections] = useState<Set<string>>(new Set());
+  const [parseDiagnostics, setParseDiagnostics] = useState<ParseDiagnostic[]>(
+    [],
+  );
+  const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>(
+    [],
+  );
+  const [collapsedYamlSections, setCollapsedYamlSections] = useState<
+    Set<string>
+  >(new Set());
   const [bulkRulesText, setBulkRulesText] = useState("");
+  const [sourcePreview, setSourcePreview] = useState<SourcePreviewState | null>(
+    null,
+  );
+  const [sourcePreviewCache, setSourcePreviewCache] = useState<
+    Record<string, SourcePreviewState>
+  >({});
 
   const policies = useMemo(
     () => [
@@ -353,6 +558,85 @@ export function DashboardWorkspace() {
 
   const removeSource = (id: string) => {
     syncSources(sources.filter((source) => source.id !== id));
+  };
+
+  const updateAdvancedSettings = (updates: Partial<AdvancedSettings>) => {
+    setAdvancedSettings((current) => ({ ...current, ...updates }));
+  };
+
+  const previewSourceNodes = async (
+    source: SubscriptionSource,
+    force = false,
+  ) => {
+    const cacheKey = `${source.id}:${source.url.trim()}`;
+    const cachedPreview = sourcePreviewCache[cacheKey];
+    if (!force && cachedPreview) {
+      setSourcePreview({ ...cachedPreview, cached: true });
+      return;
+    }
+    if (force) {
+      setSourcePreviewCache((cache) => {
+        const next = { ...cache };
+        delete next[cacheKey];
+        return next;
+      });
+    }
+
+    if (!source.url.trim()) {
+      setSourcePreview({
+        sourceId: source.id,
+        cacheKey,
+        loading: false,
+        nodes: [],
+        errors: [{ error: "订阅源 URL 不能为空" }],
+        diagnostics: [],
+        cached: false,
+      });
+      return;
+    }
+
+    setSourcePreview({
+      sourceId: source.id,
+      cacheKey,
+      loading: true,
+      nodes: [],
+      errors: [],
+      diagnostics: [],
+      cached: false,
+    });
+
+    const response = await fetch("/api/parse", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        urls: serializeSubscriptionSources([{ ...source, enabled: true }]),
+      }),
+    });
+    const data = await response.json();
+    if (!data.success) {
+      setSourcePreview({
+        sourceId: source.id,
+        cacheKey,
+        loading: false,
+        nodes: [],
+        errors: [{ error: data.error || "解析失败" }],
+        diagnostics: [],
+        cached: false,
+      });
+      return;
+    }
+
+    const nextPreview = {
+      sourceId: source.id,
+      cacheKey,
+      loading: false,
+      nodes: data.proxies || [],
+      errors: data.errors || [],
+      diagnostics: data.diagnostics || [],
+      cached: false,
+    };
+    setSourcePreview(nextPreview);
+    setSourcePreviewCache((cache) => ({ ...cache, [cacheKey]: nextPreview }));
   };
 
   const yamlBlocks = useMemo(
@@ -408,7 +692,8 @@ export function DashboardWorkspace() {
       setName(config.name || "ruley");
       setUrls(config.urls || "");
       setSources(parseSubscriptionSources(config.urls || ""));
-      setAdvancedDns(Boolean(config.advancedDns));
+      const nextAdvancedSettings = normalizeAdvancedSettings(config.settings);
+      setAdvancedSettings(nextAdvancedSettings);
       setGroups(
         config.proxyGroups?.length ? config.proxyGroups : defaultGroups(),
       );
@@ -460,7 +745,9 @@ export function DashboardWorkspace() {
     startTransition(async () => {
       const issues = validateWorkspace({ nodes, groups, rules });
       setValidationIssues(issues);
-      const blockingIssues = issues.filter((issue) => issue.severity === "error");
+      const blockingIssues = issues.filter(
+        (issue) => issue.severity === "error",
+      );
       if (blockingIssues.length > 0) {
         toastManager.add({
           type: "warning",
@@ -476,7 +763,7 @@ export function DashboardWorkspace() {
           proxies: nodes,
           proxyGroups: groups,
           rules,
-          settings: { advancedDns },
+          settings: serializeAdvancedSettings(advancedSettings),
         }),
       });
       const data = await response.json();
@@ -500,7 +787,9 @@ export function DashboardWorkspace() {
       }
       const issues = validateWorkspace({ nodes, groups, rules });
       setValidationIssues(issues);
-      const blockingIssues = issues.filter((issue) => issue.severity === "error");
+      const blockingIssues = issues.filter(
+        (issue) => issue.severity === "error",
+      );
       if (blockingIssues.length > 0) {
         toastManager.add({
           type: "warning",
@@ -519,7 +808,7 @@ export function DashboardWorkspace() {
           name: parentId ? `${name} 分支` : name,
           proxyGroups: groups,
           rules,
-          advancedDns,
+          settings: serializeAdvancedSettings(advancedSettings),
           parsedNodes: nodes,
           generatedConfig,
         }),
@@ -595,11 +884,17 @@ export function DashboardWorkspace() {
 
         <div className="grid items-stretch gap-6 xl:grid-cols-[1.05fr_1fr]">
           <Card className="h-128 min-h-0">
-            <CardHeader>
-              <CardTitle>订阅来源</CardTitle>
-              <CardDescription>
-                支持订阅链接、Base64、YAML 或节点 URI
-              </CardDescription>
+            <CardHeader className="gap-3 md:grid-cols-[1fr_auto]">
+              <div className="flex flex-col gap-1">
+                <CardTitle>订阅来源</CardTitle>
+                <CardDescription>
+                  支持订阅链接、Base64、YAML 或节点 URI
+                </CardDescription>
+              </div>
+              <AdvancedSettingsDialog
+                settings={advancedSettings}
+                onChange={updateAdvancedSettings}
+              />
             </CardHeader>
             <CardContent className="min-h-0 flex-1 overflow-auto flex flex-col gap-4">
               <label className="flex flex-col gap-2 text-sm font-medium">
@@ -620,7 +915,8 @@ export function DashboardWorkspace() {
                 </div>
                 {sources.length === 0 ? (
                   <div className="rounded-xl border p-3 text-sm text-muted-foreground">
-                    暂无订阅源，点击添加后输入订阅链接、节点 URI、Base64 或 YAML。
+                    暂无订阅源，点击添加后输入订阅链接、节点 URI、Base64 或
+                    YAML。
                   </div>
                 ) : (
                   <div className="flex flex-col gap-3">
@@ -651,30 +947,159 @@ export function DashboardWorkspace() {
                             <Trash2Icon aria-hidden="true" />
                           </Button>
                         </div>
-                        <Textarea
-                          value={source.url}
-                          onChange={(event) =>
-                            updateSource(source.id, { url: event.target.value })
-                          }
-                          placeholder="订阅链接、节点 URI、Base64 或 YAML"
-                          className="min-h-24 font-mono text-xs"
-                        />
+                        <div className="flex gap-2">
+                          <Input
+                            nativeInput
+                            value={source.url}
+                            onChange={(event) =>
+                              updateSource(source.id, {
+                                url: event.target.value,
+                              })
+                            }
+                            placeholder="订阅链接、节点 URI 或 Base64"
+                            className="font-mono text-xs"
+                          />
+                          <Dialog>
+                            <DialogTrigger
+                              render={
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => previewSourceNodes(source)}
+                                />
+                              }
+                            >
+                              预览
+                            </DialogTrigger>
+                            <DialogPopup>
+                              <DialogHeader>
+                                <div className="flex items-start justify-between gap-3 pr-8">
+                                  <div className="flex flex-col gap-2">
+                                    <DialogTitle>节点预览</DialogTitle>
+                                    <DialogDescription>
+                                      {source.name}
+                                    </DialogDescription>
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      previewSourceNodes(source, true)
+                                    }
+                                  >
+                                    <RefreshCwIcon aria-hidden="true" />
+                                    刷新
+                                  </Button>
+                                </div>
+                              </DialogHeader>
+                              <DialogPanel>
+                                {sourcePreview?.sourceId === source.id &&
+                                sourcePreview.loading ? (
+                                  <div className="rounded-lg border p-3 text-sm text-muted-foreground">
+                                    正在解析订阅源...
+                                  </div>
+                                ) : sourcePreview?.sourceId === source.id ? (
+                                  <div className="flex flex-col gap-3">
+                                    <div className="flex flex-wrap gap-2">
+                                      <Badge variant="info">
+                                        节点 {sourcePreview.nodes.length}
+                                      </Badge>
+                                      {sourcePreview.cached && (
+                                        <Badge variant="success">缓存</Badge>
+                                      )}
+                                      {sourcePreview.errors.length > 0 && (
+                                        <Badge variant="error">
+                                          错误 {sourcePreview.errors.length}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    {sourcePreview.diagnostics.length > 0 && (
+                                      <div className="grid gap-2 rounded-lg border bg-muted/30 p-2">
+                                        <div className="text-xs text-muted-foreground">
+                                          解析后已自动完成节点去重、同名重命名与名称归一化。
+                                        </div>
+                                        {sourcePreview.diagnostics.map(
+                                          (diagnostic, diagnosticIndex) => (
+                                            <div
+                                              key={`source-diagnostic-${diagnosticIndex}`}
+                                              className="flex items-start gap-2 rounded-md border bg-background p-2 text-sm"
+                                            >
+                                              <Badge
+                                                variant={
+                                                  diagnostic.type ===
+                                                  "duplicate"
+                                                    ? "warning"
+                                                    : "outline"
+                                                }
+                                              >
+                                                {diagnostic.type === "duplicate"
+                                                  ? "去重"
+                                                  : diagnostic.type ===
+                                                      "renamed"
+                                                    ? "重命名"
+                                                    : "跳过"}
+                                              </Badge>
+                                              <span className="text-muted-foreground">
+                                                {diagnostic.message}
+                                              </span>
+                                            </div>
+                                          ),
+                                        )}
+                                      </div>
+                                    )}
+                                    {sourcePreview.errors.length > 0 && (
+                                      <div className="grid gap-2">
+                                        {sourcePreview.errors.map(
+                                          (error, errorIndex) => (
+                                            <div
+                                              key={`source-error-${errorIndex}`}
+                                              className="rounded-lg border border-destructive/30 bg-destructive/8 p-2 text-sm"
+                                            >
+                                              {error.error || "解析失败"}
+                                            </div>
+                                          ),
+                                        )}
+                                      </div>
+                                    )}
+                                    {sourcePreview.nodes.length > 0 ? (
+                                      <div className="max-h-96 overflow-auto rounded-lg border">
+                                        {sourcePreview.nodes.map(
+                                          (node, nodeIndex) => (
+                                            <div
+                                              key={`${String(node.name)}-${nodeIndex}`}
+                                              className="grid gap-1 border-b p-2 text-sm last:border-b-0"
+                                            >
+                                              <div className="font-medium">
+                                                {String(node.name || "Unnamed")}
+                                              </div>
+                                              <div className="text-xs text-muted-foreground">
+                                                {String(node.type || "unknown")}{" "}
+                                                · {String(node.server || "-")}:
+                                                {String(node.port || "-")}
+                                              </div>
+                                            </div>
+                                          ),
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className="rounded-lg border p-3 text-sm text-muted-foreground">
+                                        暂无可预览节点
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="rounded-lg border p-3 text-sm text-muted-foreground">
+                                    点击预览后显示节点
+                                  </div>
+                                )}
+                              </DialogPanel>
+                            </DialogPopup>
+                          </Dialog>
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
-              </div>
-              <div className="flex items-center justify-between gap-3 rounded-xl border p-3">
-                <div className="flex flex-col gap-1">
-                  <span className="text-sm font-medium">高级防泄漏 DNS</span>
-                  <span className="text-muted-foreground text-sm">
-                    生成配置时启用更稳妥的 DNS fallback
-                  </span>
-                </div>
-                <Switch
-                  checked={advancedDns}
-                  onCheckedChange={setAdvancedDns}
-                />
               </div>
               <Button
                 variant="outline"
@@ -694,13 +1119,19 @@ export function DashboardWorkspace() {
                   </div>
                   {validationIssues.length > 0 && (
                     <div className="flex flex-col gap-2">
-                      <div className="text-muted-foreground text-xs">生成前校验</div>
+                      <div className="text-muted-foreground text-xs">
+                        生成前校验
+                      </div>
                       {validationIssues.map((issue, index) => (
                         <div
                           key={`validation-${index}`}
                           className="flex items-start gap-2 rounded-lg border bg-background p-2 text-sm"
                         >
-                          <Badge variant={issue.severity === "error" ? "error" : "warning"}>
+                          <Badge
+                            variant={
+                              issue.severity === "error" ? "error" : "warning"
+                            }
+                          >
                             {issue.severity === "error" ? "错误" : "警告"}
                           </Badge>
                           <span>{issue.message}</span>
@@ -733,7 +1164,9 @@ export function DashboardWorkspace() {
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                         <span>解析处理</span>
-                        <Badge variant="outline">{parseDiagnostics.length}</Badge>
+                        <Badge variant="outline">
+                          {parseDiagnostics.length}
+                        </Badge>
                       </div>
                       {parseDiagnostics.map((diagnostic, index) => (
                         <div
@@ -741,7 +1174,11 @@ export function DashboardWorkspace() {
                           className="flex items-start gap-2 rounded-lg border bg-background p-2 text-sm text-muted-foreground"
                         >
                           <Badge
-                            variant={diagnostic.type === "duplicate" ? "warning" : "outline"}
+                            variant={
+                              diagnostic.type === "duplicate"
+                                ? "warning"
+                                : "outline"
+                            }
                           >
                             {diagnostic.type === "duplicate"
                               ? "去重"
@@ -772,17 +1209,6 @@ export function DashboardWorkspace() {
                   <Badge variant="info">节点 {nodes.length}</Badge>
                   <Badge variant="success">代理组 {groups.length}</Badge>
                   <Badge variant="warning">规则 {rules.length}</Badge>
-                  {nodes.slice(0, 3).map((node, index) => (
-                    <Badge
-                      key={`${String(node.name)}-${index}`}
-                      variant="outline"
-                    >
-                      {String(node.name || "Unnamed")}
-                    </Badge>
-                  ))}
-                  {nodes.length > 3 && (
-                    <Badge variant="outline">+{nodes.length - 3}</Badge>
-                  )}
                 </div>
               </CardHeader>
               <CardContent className="min-h-0 flex-1 flex flex-col gap-3 overflow-hidden">
@@ -806,7 +1232,10 @@ export function DashboardWorkspace() {
                       {yamlBlocks.map((block) => {
                         const collapsed = collapsedYamlSections.has(block.key);
                         return (
-                          <section key={block.key} className="rounded-lg border bg-background/72">
+                          <section
+                            key={block.key}
+                            className="rounded-lg border bg-background/72"
+                          >
                             {block.foldable ? (
                               <button
                                 type="button"
@@ -815,9 +1244,15 @@ export function DashboardWorkspace() {
                               >
                                 <span className="flex items-center gap-2 font-medium">
                                   {collapsed ? (
-                                    <ChevronRightIcon className="size-4" aria-hidden="true" />
+                                    <ChevronRightIcon
+                                      className="size-4"
+                                      aria-hidden="true"
+                                    />
                                   ) : (
-                                    <ChevronDownIcon className="size-4" aria-hidden="true" />
+                                    <ChevronDownIcon
+                                      className="size-4"
+                                      aria-hidden="true"
+                                    />
                                   )}
                                   {block.label}
                                 </span>
@@ -825,7 +1260,10 @@ export function DashboardWorkspace() {
                               </button>
                             ) : null}
                             {!collapsed && (
-                              <HighlightedYaml content={block.content} compact={block.foldable} />
+                              <HighlightedYaml
+                                content={block.content}
+                                compact={block.foldable}
+                              />
                             )}
                           </section>
                         );
@@ -859,7 +1297,8 @@ export function DashboardWorkspace() {
                   <DialogHeader>
                     <DialogTitle>批量导入规则</DialogTitle>
                     <DialogDescription>
-                      每行一条规则，格式为 TYPE,value,policy；MATCH 使用 MATCH,policy。
+                      每行一条规则，格式为 TYPE,value,policy；MATCH 使用
+                      MATCH,policy。
                     </DialogDescription>
                   </DialogHeader>
                   <DialogPanel>
@@ -876,7 +1315,10 @@ export function DashboardWorkspace() {
                     </DialogClose>
                     <DialogClose
                       render={
-                        <Button disabled={!bulkRulesText.trim()} onClick={importBulkRules} />
+                        <Button
+                          disabled={!bulkRulesText.trim()}
+                          onClick={importBulkRules}
+                        />
                       }
                     >
                       导入规则

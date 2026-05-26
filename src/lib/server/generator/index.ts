@@ -63,7 +63,7 @@ export const generateConfig = (req: GenerateRequest): string => {
   const { proxies: rawProxies = [], proxyGroups = [], rules = [], settings = {} } = req;
 
   const {
-    port = 7897, allowLan = true, mode = 'rule', logLevel = 'info',
+    port = 7897, socksPort, allowLan = true, mode = 'rule', logLevel = 'info',
     externalController = '', secret = 'set-your-secret', advancedDns = true
   } = settings;
 
@@ -220,6 +220,7 @@ export const generateConfig = (req: GenerateRequest): string => {
   const config: any = {
     mode,
     'mixed-port': port,
+    ...(socksPort ? { 'socks-port': socksPort } : {}),
     'allow-lan': allowLan,
     'log-level': logLevel,
     ipv6: true,

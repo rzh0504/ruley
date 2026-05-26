@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       name: body.data.name,
       urls: body.data.urls,
       platform: "mihomo",
-      advancedDns: body.data.advancedDns,
+      settings: body.data.settings,
       proxyGroups: body.data.proxyGroups,
       rules: body.data.rules,
       nodeCount: current.nodeCount,

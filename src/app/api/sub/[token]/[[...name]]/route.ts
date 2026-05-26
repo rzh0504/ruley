@@ -32,7 +32,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
       urls: row.urls,
       proxyGroups: row.proxyGroups,
       rules: row.rules,
-      advancedDns: row.advancedDns,
+      settings: row.settings,
     });
 
     await db.update(configs).set({

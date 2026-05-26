@@ -22,7 +22,7 @@ export const cloudSaveSchema = z.object({
   name: z.string().optional(),
   proxyGroups: z.array(z.record(z.string(), z.unknown())).default([]),
   rules: z.array(z.record(z.string(), z.unknown())).default([]),
-  advancedDns: z.boolean().default(true),
+  settings: z.record(z.string(), z.unknown()).default({}),
   parsedNodes: z.array(z.record(z.string(), z.unknown())).default([]),
   generatedConfig: z.string().optional(),
 });
@@ -36,6 +36,6 @@ export const configUpdateSchema = z.object({
   urls: z.string().min(1).optional(),
   proxyGroups: z.array(z.record(z.string(), z.unknown())).optional(),
   rules: z.array(z.record(z.string(), z.unknown())).optional(),
-  advancedDns: z.boolean().optional(),
+  settings: z.record(z.string(), z.unknown()).optional(),
   parsedNodes: z.array(z.record(z.string(), z.unknown())).optional(),
 });

@@ -32,24 +32,27 @@ export const buildCurrentConfig = async ({
   parsedNodes,
   proxyGroups,
   rules,
-  advancedDns,
+  settings,
 }: {
   urls?: string;
   parsedNodes?: unknown;
   proxyGroups?: unknown;
   rules?: unknown;
-  advancedDns?: boolean | number;
+  settings?: unknown;
 }) => {
   const proxies = Array.isArray(parsedNodes) && parsedNodes.length > 0
     ? parsedNodes
     : (await parseInput(getActiveSubscriptionInput(urls || ""))).proxies;
   const groups = Array.isArray(proxyGroups) ? proxyGroups : [];
   const ruleItems = Array.isArray(rules) ? rules : [];
+  const configSettings = settings && typeof settings === "object" && !Array.isArray(settings)
+    ? settings as Record<string, unknown>
+    : {};
   const yamlStr = generateConfig({
     proxies,
     proxyGroups: groups as any,
     rules: ruleItems as any,
-    settings: { advancedDns: advancedDns === true || advancedDns === 1 },
+    settings: configSettings,
   });
 
   return {

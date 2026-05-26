@@ -35,14 +35,14 @@ export async function PUT(request: Request, { params }: Params) {
     const proxyGroups = body.data.proxyGroups ?? existing.proxyGroups;
     const rules = body.data.rules ?? existing.rules;
     const parsedNodes = body.data.parsedNodes ?? existing.parsedNodes ?? undefined;
-    const advancedDns = body.data.advancedDns ?? existing.advancedDns;
+    const settings = body.data.settings ?? existing.settings;
     const urls = body.data.urls ?? existing.urls;
-    const current = await buildCurrentConfig({ urls, parsedNodes, proxyGroups, rules, advancedDns });
+    const current = await buildCurrentConfig({ urls, parsedNodes, proxyGroups, rules, settings });
 
     await db.update(configs).set({
       name: body.data.name ?? existing.name,
       urls,
-      advancedDns,
+      settings,
       proxyGroups,
       rules,
       nodeCount: current.nodeCount,
