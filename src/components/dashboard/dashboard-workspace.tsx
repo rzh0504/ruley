@@ -91,6 +91,7 @@ type YamlBlock = {
 };
 type ConfigRecord = {
   id: number;
+  publicId: string;
   name: string;
   urls: string;
   settings?: Partial<AdvancedSettings> | null;
@@ -168,6 +169,29 @@ const serializeAdvancedSettings = (settings: AdvancedSettings) => ({
   ...settings,
   socksPort: settings.socksPort > 0 ? settings.socksPort : undefined,
 });
+
+const getDisplayCloudUrl = (cloudUrl?: string | null) => {
+  if (!cloudUrl) return "";
+  if (/^https?:\/\//.test(cloudUrl) || typeof window === "undefined") return cloudUrl;
+  return window.location.origin + cloudUrl;
+};
+
+const getInitialWorkspaceState = (config?: ConfigRecord | null) => {
+  const urls = config?.urls || "";
+
+  return {
+    currentConfigId: config?.id ?? null,
+    name: config?.name || "ruley",
+    urls,
+    sources: parseSubscriptionSources(urls),
+    nodes: config?.parsedNodes || [],
+    groups: config?.proxyGroups?.length ? config.proxyGroups : defaultGroups(),
+    rules: config?.rules || [],
+    advancedSettings: normalizeAdvancedSettings(config?.settings),
+    generatedConfig: config?.generatedConfig || "",
+    cloudUrl: getDisplayCloudUrl(config?.cloudUrl),
+  };
+};
 
 const isComplexRegex = (value: string) =>
   value.length > 120 || /\([^)]*[+*][^)]*\)[+*?{]/.test(value);
@@ -497,21 +521,20 @@ function AdvancedSettingsDialog({
   );
 }
 
-export function DashboardWorkspace() {
+export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRecord | null }) {
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
-  const [name, setName] = useState("ruley");
-  const [urls, setUrls] = useState("");
-  const [sources, setSources] = useState<SubscriptionSource[]>([]);
-  const [nodes, setNodes] = useState<Record<string, unknown>[]>([]);
-  const [groups, setGroups] = useState<ProxyGroupTemplate[]>(defaultGroups);
-  const [rules, setRules] = useState<RuleItem[]>([]);
-  const [advancedSettings, setAdvancedSettings] = useState<AdvancedSettings>(
-    defaultAdvancedSettings,
-  );
-  const [generatedConfig, setGeneratedConfig] = useState("");
-  const [cloudUrl, setCloudUrl] = useState("");
-  const [currentConfigId, setCurrentConfigId] = useState<number | null>(null);
+  const initialState = getInitialWorkspaceState(initialConfig);
+  const [name, setName] = useState(initialState.name);
+  const [urls, setUrls] = useState(initialState.urls);
+  const [sources, setSources] = useState<SubscriptionSource[]>(initialState.sources);
+  const [nodes, setNodes] = useState<Record<string, unknown>[]>(initialState.nodes);
+  const [groups, setGroups] = useState<ProxyGroupTemplate[]>(initialState.groups);
+  const [rules, setRules] = useState<RuleItem[]>(initialState.rules);
+  const [advancedSettings, setAdvancedSettings] = useState<AdvancedSettings>(initialState.advancedSettings);
+  const [generatedConfig, setGeneratedConfig] = useState(initialState.generatedConfig);
+  const [cloudUrl, setCloudUrl] = useState(initialState.cloudUrl);
+  const [currentConfigId, setCurrentConfigId] = useState<number | null>(initialState.currentConfigId);
   const [parseErrors, setParseErrors] = useState<ParseErrorRecord[]>([]);
   const [parseDiagnostics, setParseDiagnostics] = useState<ParseDiagnostic[]>(
     [],
@@ -542,6 +565,23 @@ export function DashboardWorkspace() {
   const syncSources = (nextSources: SubscriptionSource[]) => {
     setSources(nextSources);
     setUrls(serializeSubscriptionSources(nextSources));
+  };
+
+  const applyConfig = (config: ConfigRecord) => {
+    const nextState = getInitialWorkspaceState(config);
+    setCurrentConfigId(nextState.currentConfigId);
+    setName(nextState.name);
+    setUrls(nextState.urls);
+    setSources(nextState.sources);
+    setAdvancedSettings(nextState.advancedSettings);
+    setGroups(nextState.groups);
+    setRules(nextState.rules);
+    setNodes(nextState.nodes);
+    setGeneratedConfig(nextState.generatedConfig);
+    setCloudUrl(nextState.cloudUrl);
+    setParseErrors([]);
+    setParseDiagnostics([]);
+    setValidationIssues([]);
   };
 
   const updateSource = (id: string, updates: Partial<SubscriptionSource>) => {
@@ -692,34 +732,23 @@ export function DashboardWorkspace() {
   useEffect(() => {
     const id = searchParams.get("configId");
     if (!id) return;
+    if (initialConfig?.publicId === id) {
+      applyConfig(initialConfig);
+      return;
+    }
     startTransition(async () => {
       const response = await fetch(`/api/configs/${id}`);
       const data = await response.json();
       if (!data.success) return;
       const config = data.config as ConfigRecord;
-      setCurrentConfigId(config.id);
-      setName(config.name || "ruley");
-      setUrls(config.urls || "");
-      setSources(parseSubscriptionSources(config.urls || ""));
-      const nextAdvancedSettings = normalizeAdvancedSettings(config.settings);
-      setAdvancedSettings(nextAdvancedSettings);
-      setGroups(
-        config.proxyGroups?.length ? config.proxyGroups : defaultGroups(),
-      );
-      setRules(config.rules || []);
-      setNodes(config.parsedNodes || []);
-      setGeneratedConfig(config.generatedConfig || "");
-      setCloudUrl(config.cloudUrl ? window.location.origin + config.cloudUrl : "");
-      setParseErrors([]);
-      setParseDiagnostics([]);
-      setValidationIssues([]);
+      applyConfig(config);
       toastManager.add({
         type: "success",
         title: "配置已加载",
         description: config.name,
       });
     });
-  }, [searchParams]);
+  }, [searchParams, initialConfig?.publicId]);
 
   const parseNodes = () =>
     startTransition(async () => {

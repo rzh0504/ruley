@@ -23,3 +23,13 @@ export const serializeConfigSummary = (row: Awaited<ReturnType<typeof listConfig
   ...row,
   updatedAt: row.updatedAt.toISOString(),
 });
+
+export const serializeConfigRecord = (row: NonNullable<Awaited<ReturnType<typeof findConfigByPublicId>>>) => ({
+  ...row,
+  proxyGroups: row.proxyGroups as any,
+  rules: row.rules as any,
+  parsedNodes: row.parsedNodes as any,
+  settings: row.settings as any,
+  createdAt: row.createdAt.toISOString(),
+  updatedAt: row.updatedAt.toISOString(),
+});
