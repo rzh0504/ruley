@@ -196,7 +196,7 @@ export function MenuRadioItem({
           <path d="M5.252 12.7 10.2 18.63 18.748 5.37" />
         </svg>
       </MenuPrimitive.RadioItemIndicator>
-      <span className="col-start-2">{children}</span>
+      <span className="col-start-2 inline-flex items-center gap-2">{children}</span>
     </MenuPrimitive.RadioItem>
   );
 }

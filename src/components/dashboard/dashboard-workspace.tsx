@@ -248,7 +248,7 @@ export function DashboardWorkspace() {
         <ProxyGroupManager groups={groups} onGroupsChange={setGroups} />
 
         <div className="grid gap-6">
-          <Card className="h-[30rem] min-h-0">
+          <Card className="h-[22rem] min-h-0">
             <CardHeader>
               <CardTitle>自定义规则</CardTitle>
               <CardDescription>添加优先级高于兜底规则的手动分流项。</CardDescription>

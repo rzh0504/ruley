@@ -171,6 +171,9 @@ export function ProxyGroupManager({
           <CardDescription>启用预设策略组，添加自定义分流组，并配置节点匹配、规则链接和链式代理。</CardDescription>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button variant="ghost" onClick={() => setMode("edit")}>
+            完成
+          </Button>
           <Button variant={mode === "presets" ? "secondary" : "outline"} onClick={() => setMode(mode === "presets" ? "edit" : "presets")}>
             <LibraryIcon aria-hidden="true" />
             预设
@@ -457,7 +460,7 @@ function PolicyOptionsPicker({
               key={option.value}
               type="button"
               onClick={() => toggle(option.value)}
-              className={`rounded-xl border p-3 text-left transition-colors ${active ? "border-primary bg-primary/8" : "hover:bg-background/72"}`}
+              className={`rounded-xl border p-3 text-left transition-colors ${active ? "border-success bg-primary/8" : "hover:bg-background/72"}`}
             >
               <div className="text-sm font-medium">{option.label}</div>
               <div className="text-muted-foreground text-xs">{option.description}</div>
@@ -491,7 +494,7 @@ function FilterPicker({ value, onChange }: { value: string; onChange: (value: st
         {commonFilters.map((filter) => {
           const active = filter.value === "^(.*)$" ? value === "^(.*)$" : value.includes(filter.value);
           return (
-            <Button key={filter.label} variant={active ? "secondary" : "outline"} size="sm" onClick={() => toggleFilter(filter.value)}>
+            <Button key={filter.label} variant={active ? "default" : "outline"} size="sm" onClick={() => toggleFilter(filter.value)}>
               {filter.label}
             </Button>
           );

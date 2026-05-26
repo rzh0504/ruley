@@ -16,6 +16,13 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem('ruley-theme')||'system';var d=t==='system'?window.matchMedia('(prefers-color-scheme: dark)').matches:t==='dark';document.documentElement.classList.toggle('dark',d);}catch(e){}`,
+          }}
+        />
+      </head>
       <body className={`${inter.variable} ${interHeading.variable} ${geistMono.variable} isolate min-h-screen bg-background font-sans text-foreground antialiased`}>
         <Providers>{children}</Providers>
       </body>
