@@ -23,24 +23,32 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toastManager } from "@/components/ui/toast";
-import { PROXY_GROUP_TEMPLATES, type ProxyGroupType } from "@/lib/config/proxy-templates";
+import {
+  PROXY_GROUP_TEMPLATES,
+  type ProxyGroupType,
+} from "@/lib/config/proxy-templates";
 import {
   defaultAdvancedSettings,
+  defaultAppearancePreferences,
   defaultParserPreferences,
   defaultProxyGroupPreferences,
+  getStoredAppearancePreferences,
   getStoredDefaultAdvancedSettings,
   getStoredParserPreferences,
   getStoredProxyGroupPreferences,
   getStoredThemeMode,
   resetStoredDefaultAdvancedSettings,
+  resetStoredAppearancePreferences,
   resetStoredParserPreferences,
   resetStoredProxyGroupPreferences,
+  setStoredAppearancePreferences,
   setStoredDefaultAdvancedSettings,
   setStoredParserPreferences,
   setStoredProxyGroupPreferences,
   setStoredThemeMode,
   themeLabels,
   type AdvancedSettings,
+  type AppearancePreferences,
   type DuplicateNameStrategy,
   type ParserPreferences,
   type ProxyGroupPreferences,
@@ -51,12 +59,19 @@ import { cn } from "@/lib/utils";
 const modeOptions = ["rule", "global", "direct"];
 const logLevelOptions = ["silent", "error", "warning", "info", "debug"];
 const themeOptions: ThemeMode[] = ["system", "light", "dark"];
-const duplicateNameOptions: { value: DuplicateNameStrategy; label: string }[] = [
-  { value: "append", label: "自动追加序号" },
-  { value: "keep", label: "保留原名" },
-  { value: "skip", label: "跳过同名节点" },
-];
+const duplicateNameOptions: { value: DuplicateNameStrategy; label: string }[] =
+  [
+    { value: "append", label: "自动追加序号" },
+    { value: "keep", label: "保留原名" },
+    { value: "skip", label: "跳过同名节点" },
+  ];
 const groupTypeOptions: ProxyGroupType[] = ["select", "url-test", "fallback"];
+const yamlSectionOptions = [
+  { value: "proxies", label: "proxies" },
+  { value: "proxy-groups", label: "proxy-groups" },
+  { value: "rule-providers", label: "rule-providers" },
+  { value: "rules", label: "rules" },
+];
 const settingsSections = [
   { id: "appearance", label: "界面偏好", description: "主题与显示" },
   { id: "parser", label: "解析行为", description: "订阅解析策略" },
@@ -101,7 +116,8 @@ function NativeSelect({
   const normalizedOptions = options.map((option) =>
     typeof option === "string" ? { value: option, label: option } : option,
   );
-  const selected = normalizedOptions.find((option) => option.value === value) || null;
+  const selected =
+    normalizedOptions.find((option) => option.value === value) || null;
 
   return (
     <Select
@@ -128,15 +144,10 @@ function SettingsInput(props: React.ComponentProps<typeof Input>) {
   return <Input nativeInput {...props} />;
 }
 
-function SettingsNumberInput(props: Omit<React.ComponentProps<typeof Input>, "type" | "inputMode">) {
-  return (
-    <Input
-      nativeInput
-      inputMode="numeric"
-      type="text"
-      {...props}
-    />
-  );
+function SettingsNumberInput(
+  props: Omit<React.ComponentProps<typeof Input>, "type" | "inputMode">,
+) {
+  return <Input nativeInput inputMode="numeric" type="text" {...props} />;
 }
 
 function PreferenceSwitch({
@@ -176,7 +187,9 @@ function CompactSwitch({
     <div className="flex items-center justify-between gap-4 py-2">
       <div className="min-w-0">
         <div className="text-sm font-medium">{title}</div>
-        <div className="truncate text-muted-foreground text-xs">{description}</div>
+        <div className="truncate text-muted-foreground text-xs">
+          {description}
+        </div>
       </div>
       <Switch checked={checked} onCheckedChange={onChange} />
     </div>
@@ -186,14 +199,23 @@ function CompactSwitch({
 export function SettingsClient() {
   const router = useRouter();
   const [themeMode, setThemeMode] = useState<ThemeMode>("system");
-  const [settings, setSettings] = useState<AdvancedSettings>(defaultAdvancedSettings);
-  const [parserPreferences, setParserPreferences] = useState<ParserPreferences>(defaultParserPreferences);
-  const [proxyGroupPreferences, setProxyGroupPreferences] = useState<ProxyGroupPreferences>(defaultProxyGroupPreferences);
-  const [activeSection, setActiveSection] = useState<SettingsSectionId>("defaults");
+  const [appearancePreferences, setAppearancePreferences] =
+    useState<AppearancePreferences>(defaultAppearancePreferences);
+  const [settings, setSettings] = useState<AdvancedSettings>(
+    defaultAdvancedSettings,
+  );
+  const [parserPreferences, setParserPreferences] = useState<ParserPreferences>(
+    defaultParserPreferences,
+  );
+  const [proxyGroupPreferences, setProxyGroupPreferences] =
+    useState<ProxyGroupPreferences>(defaultProxyGroupPreferences);
+  const [activeSection, setActiveSection] =
+    useState<SettingsSectionId>("defaults");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     setThemeMode(getStoredThemeMode());
+    setAppearancePreferences(getStoredAppearancePreferences());
     setSettings(getStoredDefaultAdvancedSettings());
     setParserPreferences(getStoredParserPreferences());
     setProxyGroupPreferences(getStoredProxyGroupPreferences());
@@ -205,13 +227,23 @@ export function SettingsClient() {
     setStoredDefaultAdvancedSettings(next);
   };
 
+  const updateAppearancePreferences = (
+    updates: Partial<AppearancePreferences>,
+  ) => {
+    const next = { ...appearancePreferences, ...updates };
+    setAppearancePreferences(next);
+    setStoredAppearancePreferences(next);
+  };
+
   const updateParserPreferences = (updates: Partial<ParserPreferences>) => {
     const next = { ...parserPreferences, ...updates };
     setParserPreferences(next);
     setStoredParserPreferences(next);
   };
 
-  const updateProxyGroupPreferences = (updates: Partial<ProxyGroupPreferences>) => {
+  const updateProxyGroupPreferences = (
+    updates: Partial<ProxyGroupPreferences>,
+  ) => {
     const next = { ...proxyGroupPreferences, ...updates };
     setProxyGroupPreferences(next);
     setStoredProxyGroupPreferences(next);
@@ -234,14 +266,29 @@ export function SettingsClient() {
   const toggleDefaultGroup = (id: string, enabled: boolean) => {
     const ids = enabled
       ? [...proxyGroupPreferences.defaultEnabledGroupIds, id]
-      : proxyGroupPreferences.defaultEnabledGroupIds.filter((item) => item !== id);
+      : proxyGroupPreferences.defaultEnabledGroupIds.filter(
+          (item) => item !== id,
+        );
     updateProxyGroupPreferences({ defaultEnabledGroupIds: [...new Set(ids)] });
+  };
+
+  const toggleCollapsedYamlSection = (key: string, enabled: boolean) => {
+    const sections = enabled
+      ? [...appearancePreferences.defaultCollapsedYamlSections, key]
+      : appearancePreferences.defaultCollapsedYamlSections.filter(
+          (item) => item !== key,
+        );
+    updateAppearancePreferences({
+      defaultCollapsedYamlSections: [...new Set(sections)],
+    });
   };
 
   const resetAllDefaults = () => {
     resetStoredDefaultAdvancedSettings();
+    resetStoredAppearancePreferences();
     resetStoredParserPreferences();
     resetStoredProxyGroupPreferences();
+    setAppearancePreferences(defaultAppearancePreferences);
     setSettings(defaultAdvancedSettings);
     setParserPreferences(defaultParserPreferences);
     setProxyGroupPreferences(defaultProxyGroupPreferences);
@@ -256,7 +303,9 @@ export function SettingsClient() {
     router.refresh();
   };
 
-  const activeSectionMeta = settingsSections.find((section) => section.id === activeSection) || settingsSections[0];
+  const activeSectionMeta =
+    settingsSections.find((section) => section.id === activeSection) ||
+    settingsSections[0];
 
   return (
     <AppShell>
@@ -270,12 +319,16 @@ export function SettingsClient() {
                   type="button"
                   className={cn(
                     "grid min-w-40 gap-0.5 rounded-xl px-3 py-2 text-left transition-colors lg:min-w-0",
-                    activeSection === section.id ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+                    activeSection === section.id
+                      ? "bg-secondary text-secondary-foreground"
+                      : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
                   )}
                   onClick={() => setActiveSection(section.id)}
                 >
                   <span className="font-medium text-sm">{section.label}</span>
-                  <span className="text-xs opacity-75">{section.description}</span>
+                  <span className="text-xs opacity-75">
+                    {section.description}
+                  </span>
                 </button>
               ))}
               <button
@@ -292,36 +345,116 @@ export function SettingsClient() {
           <Card>
             <CardHeader>
               <CardTitle className="inline-flex items-center gap-2">
-                {activeSection === "defaults" && <SlidersHorizontalIcon aria-hidden="true" className="size-5" />}
+                {activeSection === "defaults" && (
+                  <SlidersHorizontalIcon
+                    aria-hidden="true"
+                    className="size-5"
+                  />
+                )}
                 {activeSectionMeta.label}
               </CardTitle>
               <CardDescription>{activeSectionMeta.description}</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4">
               {activeSection === "appearance" && (
-                <div className="grid gap-3">
-                  <div className="text-sm font-medium">主题模式</div>
-                  <div className="flex w-fit rounded-lg border bg-muted/40 p-1">
-                    {themeOptions.map((mode) => (
-                      <Button key={mode} variant={themeMode === mode ? "secondary" : "ghost"} size="xs" onClick={() => updateTheme(mode)}>
-                        {themeLabels[mode]}
-                      </Button>
-                    ))}
+                <div className="grid gap-5">
+                  <div className="grid gap-3">
+                    <div className="text-sm font-medium">主题模式</div>
+                    <div className="flex w-fit rounded-lg border bg-muted/40 p-1">
+                      {themeOptions.map((mode) => (
+                        <Button
+                          key={mode}
+                          variant={themeMode === mode ? "secondary" : "ghost"}
+                          size="xs"
+                          onClick={() => updateTheme(mode)}
+                        >
+                          {themeLabels[mode]}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
-                  <p className="text-muted-foreground text-xs">顶部主题按钮与这里保持同步</p>
+
+                  <Field
+                    label="默认配置名称"
+                    description="新建空白配置时按前缀自动生成递增名称"
+                  >
+                    <SettingsInput
+                      value={appearancePreferences.defaultConfigNamePrefix}
+                      onChange={(event) =>
+                        updateAppearancePreferences({
+                          defaultConfigNamePrefix: event.target.value,
+                        })
+                      }
+                      placeholder={defaultAppearancePreferences.defaultConfigNamePrefix}
+                    />
+                  </Field>
+
+                  <div className="grid gap-3">
+                    <div>
+                      <div className="text-sm font-medium">
+                        YAML 默认折叠区块
+                      </div>
+                      <div className="text-muted-foreground text-xs">
+                        生成 YAML 后默认收起这些大区块
+                      </div>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {yamlSectionOptions.map((section) => (
+                        <label
+                          key={section.value}
+                          className="flex items-center justify-between gap-3 rounded-xl border p-3 text-sm"
+                        >
+                          <span>{section.label}</span>
+                          <Switch
+                            checked={appearancePreferences.defaultCollapsedYamlSections.includes(
+                              section.value,
+                            )}
+                            onCheckedChange={(checked) =>
+                              toggleCollapsedYamlSection(section.value, checked)
+                            }
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
 
               {activeSection === "parser" && (
                 <div className="grid gap-1 divide-y">
-                  <CompactSwitch title="跳过重复节点" description="按协议、服务器、端口和凭据识别重复节点" checked={parserPreferences.skipDuplicateNodes} onChange={(skipDuplicateNodes) => updateParserPreferences({ skipDuplicateNodes })} />
-                  <CompactSwitch title="解析失败继续" description="某个订阅源失败时继续处理其他来源" checked={parserPreferences.continueOnParseError} onChange={(continueOnParseError) => updateParserPreferences({ continueOnParseError })} />
+                  <CompactSwitch
+                    title="跳过重复节点"
+                    description="按协议、服务器、端口和凭据识别重复节点"
+                    checked={parserPreferences.skipDuplicateNodes}
+                    onChange={(skipDuplicateNodes) =>
+                      updateParserPreferences({ skipDuplicateNodes })
+                    }
+                  />
+                  <CompactSwitch
+                    title="解析失败继续"
+                    description="某个订阅源失败时继续处理其他来源"
+                    checked={parserPreferences.continueOnParseError}
+                    onChange={(continueOnParseError) =>
+                      updateParserPreferences({ continueOnParseError })
+                    }
+                  />
                   <div className="grid gap-2 py-2">
                     <div>
                       <div className="text-sm font-medium">节点重名策略</div>
-                      <div className="text-muted-foreground text-xs">处理不同节点但名称相同的情况</div>
+                      <div className="text-muted-foreground text-xs">
+                        处理不同节点但名称相同的情况
+                      </div>
                     </div>
-                    <NativeSelect value={parserPreferences.duplicateNameStrategy} options={duplicateNameOptions} onChange={(duplicateNameStrategy) => updateParserPreferences({ duplicateNameStrategy: duplicateNameStrategy as DuplicateNameStrategy })} />
+                    <NativeSelect
+                      value={parserPreferences.duplicateNameStrategy}
+                      options={duplicateNameOptions}
+                      onChange={(duplicateNameStrategy) =>
+                        updateParserPreferences({
+                          duplicateNameStrategy:
+                            duplicateNameStrategy as DuplicateNameStrategy,
+                        })
+                      }
+                    />
                   </div>
                 </div>
               )}
@@ -329,47 +462,185 @@ export function SettingsClient() {
               {activeSection === "defaults" && (
                 <>
                   <div className="grid gap-3 md:grid-cols-2">
-                    <PreferenceSwitch title="高级防泄漏 DNS" description="启用更稳妥的 DNS fallback 与过滤配置" checked={settings.advancedDns} onChange={(advancedDns) => updateSettings({ advancedDns })} />
-                    <PreferenceSwitch title="Allow LAN" description="允许局域网设备连接本机代理端口" checked={settings.allowLan} onChange={(allowLan) => updateSettings({ allowLan })} />
+                    <PreferenceSwitch
+                      title="高级防泄漏 DNS"
+                      description="启用更稳妥的 DNS fallback 与过滤配置"
+                      checked={settings.advancedDns}
+                      onChange={(advancedDns) =>
+                        updateSettings({ advancedDns })
+                      }
+                    />
+                    <PreferenceSwitch
+                      title="Allow LAN"
+                      description="允许局域网设备连接本机代理端口"
+                      checked={settings.allowLan}
+                      onChange={(allowLan) => updateSettings({ allowLan })}
+                    />
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
-                    <Field label="Mixed Port" description="Mihomo HTTP 与 SOCKS 混合代理端口"><SettingsNumberInput value={settings.port} onChange={(event) => updateSettings({ port: Number(event.target.value || defaultAdvancedSettings.port) })} /></Field>
-                    <Field label="Socks Port" description="0 表示生成时不写入"><SettingsNumberInput value={settings.socksPort} onChange={(event) => updateSettings({ socksPort: Number(event.target.value || 0) })} /></Field>
-                    <Field label="Mode" description="Mihomo 默认代理模式"><NativeSelect value={settings.mode} options={modeOptions} onChange={(mode) => updateSettings({ mode })} /></Field>
-                    <Field label="Log Level" description="生成配置中的日志输出级别"><NativeSelect value={settings.logLevel} options={logLevelOptions} onChange={(logLevel) => updateSettings({ logLevel })} /></Field>
-                    <Field label="默认策略组模式" description="新建代理组模板时默认使用的组类型"><NativeSelect value={proxyGroupPreferences.defaultProxyGroupType} options={groupTypeOptions} onChange={(defaultProxyGroupType) => updateProxyGroupPreferences({ defaultProxyGroupType: defaultProxyGroupType as ProxyGroupType })} /></Field>
-                    <Field label="默认测速间隔" description="用于 url-test/fallback 代理组"><SettingsNumberInput value={proxyGroupPreferences.defaultTestInterval} onChange={(event) => updateProxyGroupPreferences({ defaultTestInterval: Number(event.target.value || defaultProxyGroupPreferences.defaultTestInterval) })} /></Field>
+                    <Field
+                      label="Mixed Port"
+                      description="Mihomo HTTP 与 SOCKS 混合代理端口"
+                    >
+                      <SettingsNumberInput
+                        value={settings.port}
+                        onChange={(event) =>
+                          updateSettings({
+                            port: Number(
+                              event.target.value ||
+                                defaultAdvancedSettings.port,
+                            ),
+                          })
+                        }
+                      />
+                    </Field>
+                    <Field label="Socks Port" description="0 表示生成时不写入">
+                      <SettingsNumberInput
+                        value={settings.socksPort}
+                        onChange={(event) =>
+                          updateSettings({
+                            socksPort: Number(event.target.value || 0),
+                          })
+                        }
+                      />
+                    </Field>
+                    <Field label="Mode" description="Mihomo 默认代理模式">
+                      <NativeSelect
+                        value={settings.mode}
+                        options={modeOptions}
+                        onChange={(mode) => updateSettings({ mode })}
+                      />
+                    </Field>
+                    <Field
+                      label="Log Level"
+                      description="生成配置中的日志输出级别"
+                    >
+                      <NativeSelect
+                        value={settings.logLevel}
+                        options={logLevelOptions}
+                        onChange={(logLevel) => updateSettings({ logLevel })}
+                      />
+                    </Field>
+                    <Field
+                      label="默认策略组模式"
+                      description="新建代理组模板时默认使用的组类型"
+                    >
+                      <NativeSelect
+                        value={proxyGroupPreferences.defaultProxyGroupType}
+                        options={groupTypeOptions}
+                        onChange={(defaultProxyGroupType) =>
+                          updateProxyGroupPreferences({
+                            defaultProxyGroupType:
+                              defaultProxyGroupType as ProxyGroupType,
+                          })
+                        }
+                      />
+                    </Field>
+                    <Field
+                      label="默认测速间隔"
+                      description="用于 url-test/fallback 代理组"
+                    >
+                      <SettingsNumberInput
+                        value={proxyGroupPreferences.defaultTestInterval}
+                        onChange={(event) =>
+                          updateProxyGroupPreferences({
+                            defaultTestInterval: Number(
+                              event.target.value ||
+                                defaultProxyGroupPreferences.defaultTestInterval,
+                            ),
+                          })
+                        }
+                      />
+                    </Field>
                   </div>
 
-                  <Field label="默认测速 URL" description="用于 url-test/fallback 代理组"><SettingsInput value={proxyGroupPreferences.defaultTestUrl} onChange={(event) => updateProxyGroupPreferences({ defaultTestUrl: event.target.value })} placeholder={defaultProxyGroupPreferences.defaultTestUrl} /></Field>
+                  <Field
+                    label="默认测速 URL"
+                    description="用于 url-test/fallback 代理组"
+                  >
+                    <SettingsInput
+                      value={proxyGroupPreferences.defaultTestUrl}
+                      onChange={(event) =>
+                        updateProxyGroupPreferences({
+                          defaultTestUrl: event.target.value,
+                        })
+                      }
+                      placeholder={defaultProxyGroupPreferences.defaultTestUrl}
+                    />
+                  </Field>
 
                   <div className="grid gap-3">
                     <div>
                       <div className="text-sm font-medium">默认启用代理组</div>
-                      <div className="text-muted-foreground text-xs">新建空白配置时自动加入这些模板</div>
+                      <div className="text-muted-foreground text-xs">
+                        新建空白配置时自动加入这些模板
+                      </div>
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                       {PROXY_GROUP_TEMPLATES.map((template) => (
-                        <label key={template.id} className="flex items-center justify-between gap-3 rounded-xl border p-3 text-sm">
-                          <span className="truncate">{template.icon} {template.name}</span>
-                          <Switch checked={proxyGroupPreferences.defaultEnabledGroupIds.includes(template.id)} onCheckedChange={(checked) => toggleDefaultGroup(template.id, checked)} />
+                        <label
+                          key={template.id}
+                          className="flex items-center justify-between gap-3 rounded-xl border p-3 text-sm"
+                        >
+                          <span className="truncate">
+                            {template.icon} {template.name}
+                          </span>
+                          <Switch
+                            checked={proxyGroupPreferences.defaultEnabledGroupIds.includes(
+                              template.id,
+                            )}
+                            onCheckedChange={(checked) =>
+                              toggleDefaultGroup(template.id, checked)
+                            }
+                          />
                         </label>
                       ))}
                     </div>
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
-                    <Field label="External Controller" description="例如 127.0.0.1:9090"><SettingsInput value={settings.externalController} onChange={(event) => updateSettings({ externalController: event.target.value })} placeholder="127.0.0.1:9090" /></Field>
-                    <Field label="Secret" description="External Controller 访问密钥"><SettingsInput value={settings.secret} onChange={(event) => updateSettings({ secret: event.target.value })} placeholder="set-your-secret" /></Field>
+                    <Field
+                      label="External Controller"
+                      description="例如 127.0.0.1:9090"
+                    >
+                      <SettingsInput
+                        value={settings.externalController}
+                        onChange={(event) =>
+                          updateSettings({
+                            externalController: event.target.value,
+                          })
+                        }
+                        placeholder="127.0.0.1:9090"
+                      />
+                    </Field>
+                    <Field
+                      label="Secret"
+                      description="External Controller 访问密钥"
+                    >
+                      <SettingsInput
+                        value={settings.secret}
+                        onChange={(event) =>
+                          updateSettings({ secret: event.target.value })
+                        }
+                        placeholder="set-your-secret"
+                      />
+                    </Field>
                   </div>
                 </>
               )}
 
               {activeSection === "account" && (
                 <div className="grid gap-3">
-                  <p className="text-muted-foreground text-sm">结束当前会话后需要重新登录才能访问工作台</p>
-                  <Button className="w-fit" variant="outline" onClick={logout} loading={isLoggingOut}>
+                  <p className="text-muted-foreground text-sm">
+                    结束当前会话后需要重新登录才能访问工作台
+                  </p>
+                  <Button
+                    className="w-fit"
+                    variant="outline"
+                    onClick={logout}
+                    loading={isLoggingOut}
+                  >
                     <LogOutIcon aria-hidden="true" />
                     退出登录
                   </Button>

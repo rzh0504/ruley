@@ -66,8 +66,10 @@ import {
   type SubscriptionSource,
 } from "@/lib/subscription-sources";
 import {
+  createNextConfigName,
   defaultAdvancedSettings,
   defaultProxyGroupPreferences,
+  getStoredAppearancePreferences,
   getStoredDefaultAdvancedSettings,
   getStoredParserPreferences,
   getStoredProxyGroupPreferences,
@@ -628,6 +630,8 @@ export function DashboardWorkspace({
 
   useEffect(() => {
     if (initialConfig || searchParams.get("configId")) return;
+    let cancelled = false;
+    const appearancePreferences = getStoredAppearancePreferences();
     const proxyGroupPreferences = getStoredProxyGroupPreferences();
     const advancedDefaults = getStoredDefaultAdvancedSettings();
     setAdvancedSettings({
@@ -636,6 +640,24 @@ export function DashboardWorkspace({
       testInterval: proxyGroupPreferences.defaultTestInterval,
     });
     setGroups(defaultGroups(proxyGroupPreferences));
+    setCollapsedYamlSections(new Set(appearancePreferences.defaultCollapsedYamlSections));
+
+    fetch("/api/configs")
+      .then((response) => response.json())
+      .then((payload) => {
+        if (cancelled || !payload.success) return;
+        const existingNames = Array.isArray(payload.configs)
+          ? payload.configs.map((config: { name?: string }) => String(config.name || ""))
+          : [];
+        setName(createNextConfigName(appearancePreferences.defaultConfigNamePrefix, existingNames));
+      })
+      .catch(() => {
+        if (!cancelled) setName(createNextConfigName(appearancePreferences.defaultConfigNamePrefix, []));
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [initialConfig, searchParams]);
 
   const policies = useMemo(

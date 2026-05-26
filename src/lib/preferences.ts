@@ -29,10 +29,16 @@ export type ProxyGroupPreferences = {
   defaultProxyGroupType: DefaultProxyGroupType;
 };
 
+export type AppearancePreferences = {
+  defaultCollapsedYamlSections: string[];
+  defaultConfigNamePrefix: string;
+};
+
 export const themeStorageKey = "ruley-theme";
 export const defaultAdvancedSettingsStorageKey = "ruley-default-advanced-settings";
 export const parserPreferencesStorageKey = "ruley-parser-preferences";
 export const proxyGroupPreferencesStorageKey = "ruley-proxy-group-preferences";
+export const appearancePreferencesStorageKey = "ruley-appearance-preferences";
 
 export const defaultEnabledGroupIds = ["1", "2", "3", "6", "25", "23"];
 export const defaultTestUrl = "https://www.gstatic.com/generate_204";
@@ -62,6 +68,11 @@ export const defaultProxyGroupPreferences: ProxyGroupPreferences = {
   defaultTestUrl,
   defaultTestInterval,
   defaultProxyGroupType: "select",
+};
+
+export const defaultAppearancePreferences: AppearancePreferences = {
+  defaultCollapsedYamlSections: [],
+  defaultConfigNamePrefix: "config",
 };
 
 export const themeLabels: Record<ThemeMode, string> = {
@@ -187,6 +198,21 @@ export function normalizeProxyGroupPreferences(
   };
 }
 
+export function normalizeAppearancePreferences(
+  preferences?: Partial<AppearancePreferences> | null,
+): AppearancePreferences {
+  return {
+    ...defaultAppearancePreferences,
+    ...preferences,
+    defaultCollapsedYamlSections: Array.isArray(preferences?.defaultCollapsedYamlSections)
+      ? preferences.defaultCollapsedYamlSections.map(String)
+      : defaultAppearancePreferences.defaultCollapsedYamlSections,
+    defaultConfigNamePrefix: String(
+      preferences?.defaultConfigNamePrefix || defaultAppearancePreferences.defaultConfigNamePrefix,
+    ).trim() || defaultAppearancePreferences.defaultConfigNamePrefix,
+  };
+}
+
 export function getStoredParserPreferences(): ParserPreferences {
   if (typeof window === "undefined") return defaultParserPreferences;
   const stored = localStorage.getItem(parserPreferencesStorageKey);
@@ -221,6 +247,23 @@ export function setStoredProxyGroupPreferences(preferences: ProxyGroupPreference
   window.dispatchEvent(new Event("ruley-preferences-change"));
 }
 
+export function getStoredAppearancePreferences(): AppearancePreferences {
+  if (typeof window === "undefined") return defaultAppearancePreferences;
+  const stored = localStorage.getItem(appearancePreferencesStorageKey);
+  if (!stored) return defaultAppearancePreferences;
+  try {
+    return normalizeAppearancePreferences(JSON.parse(stored));
+  } catch {
+    return defaultAppearancePreferences;
+  }
+}
+
+export function setStoredAppearancePreferences(preferences: AppearancePreferences) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(appearancePreferencesStorageKey, JSON.stringify(normalizeAppearancePreferences(preferences)));
+  window.dispatchEvent(new Event("ruley-preferences-change"));
+}
+
 export function resetStoredParserPreferences() {
   if (typeof window === "undefined") return;
   localStorage.removeItem(parserPreferencesStorageKey);
@@ -231,4 +274,26 @@ export function resetStoredProxyGroupPreferences() {
   if (typeof window === "undefined") return;
   localStorage.removeItem(proxyGroupPreferencesStorageKey);
   window.dispatchEvent(new Event("ruley-preferences-change"));
+}
+
+export function resetStoredAppearancePreferences() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(appearancePreferencesStorageKey);
+  window.dispatchEvent(new Event("ruley-preferences-change"));
+}
+
+export function createNextConfigName(prefix: string, existingNames: string[]): string {
+  const normalizedPrefix = prefix.trim() || defaultAppearancePreferences.defaultConfigNamePrefix;
+  const escapedPrefix = normalizedPrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`^${escapedPrefix}(?:_(\\d+))?$`);
+  const usedNumbers = existingNames.reduce((numbers, name) => {
+    const match = name.match(pattern);
+    if (!match) return numbers;
+    numbers.add(match[1] ? Number(match[1]) : 1);
+    return numbers;
+  }, new Set<number>());
+
+  let next = 1;
+  while (usedNumbers.has(next)) next += 1;
+  return `${normalizedPrefix}_${next}`;
 }
