@@ -5,7 +5,6 @@ import { useDeferredValue, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CloudIcon, ExternalLinkIcon, GitBranchIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,6 +22,7 @@ type ConfigRecord = {
 };
 
 type ConfigFilter = "all" | "hosted" | "branches";
+type ConfigSort = "updated" | "name" | "nodes";
 
 const configFilters: { value: ConfigFilter; label: string }[] = [
   { value: "all", label: "全部" },
@@ -30,10 +30,17 @@ const configFilters: { value: ConfigFilter; label: string }[] = [
   { value: "branches", label: "分支" },
 ];
 
+const configSorts: { value: ConfigSort; label: string }[] = [
+  { value: "updated", label: "最近更新" },
+  { value: "name", label: "名称" },
+  { value: "nodes", label: "节点数" },
+];
+
 export function ConfigsClient({ initialConfigs }: { initialConfigs: ConfigRecord[] }) {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ConfigFilter>("all");
+  const [sort, setSort] = useState<ConfigSort>("updated");
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["configs"],
@@ -73,16 +80,22 @@ export function ConfigsClient({ initialConfigs }: { initialConfigs: ConfigRecord
 
   const configs = data || [];
   const filteredConfigs = useMemo(
-    () => configs.filter((config) => {
-      const matchesQuery = !deferredQuery || config.name.toLowerCase().includes(deferredQuery);
-      const matchesFilter =
-        filter === "all" ||
-        (filter === "hosted" && Boolean(config.cloudToken)) ||
-        (filter === "branches" && Boolean(config.parentId));
+    () => configs
+      .filter((config) => {
+        const matchesQuery = !deferredQuery || config.name.toLowerCase().includes(deferredQuery);
+        const matchesFilter =
+          filter === "all" ||
+          (filter === "hosted" && Boolean(config.cloudToken)) ||
+          (filter === "branches" && Boolean(config.parentId));
 
-      return matchesQuery && matchesFilter;
-    }),
-    [configs, deferredQuery, filter],
+        return matchesQuery && matchesFilter;
+      })
+      .sort((a, b) => {
+        if (sort === "name") return a.name.localeCompare(b.name, "zh-CN");
+        if (sort === "nodes") return (b.nodeCount || 0) - (a.nodeCount || 0);
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      }),
+    [configs, deferredQuery, filter, sort],
   );
 
   return (
@@ -98,7 +111,7 @@ export function ConfigsClient({ initialConfigs }: { initialConfigs: ConfigRecord
           </Button>
         </section>
 
-        <section className="flex flex-col gap-3 rounded-xl border bg-card p-3 md:flex-row md:items-center md:justify-between">
+        <section className="flex flex-col gap-3 rounded-xl border bg-card p-3">
           <Input
             nativeInput
             type="search"
@@ -107,24 +120,45 @@ export function ConfigsClient({ initialConfigs }: { initialConfigs: ConfigRecord
             placeholder="搜索配置名称"
             className="md:max-w-sm"
           />
-          <div className="flex flex-wrap gap-2">
-            {configFilters.map((item) => (
-              <Button
-                key={item.value}
-                variant={filter === item.value ? "secondary" : "outline"}
-                size="sm"
-                onClick={() => setFilter(item.value)}
-              >
-                {item.label}
-              </Button>
-            ))}
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap gap-2">
+              {configFilters.map((item) => (
+                <Button
+                  key={item.value}
+                  variant={filter === item.value ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={() => setFilter(item.value)}
+                >
+                  {item.label}
+                </Button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {configSorts.map((item) => (
+                <Button
+                  key={item.value}
+                  variant={sort === item.value ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={() => setSort(item.value)}
+                >
+                  {item.label}
+                </Button>
+              ))}
+            </div>
           </div>
         </section>
 
         {isLoading ? (
           <Card><CardContent className="p-8 text-muted-foreground">加载中...</CardContent></Card>
         ) : configs.length === 0 ? (
-          <Card><CardContent className="p-8 text-muted-foreground">暂无配置，请先在工作台保存托管</CardContent></Card>
+          <Card>
+            <CardContent className="flex flex-col items-start gap-4 p-8 text-muted-foreground">
+              <span>暂无配置，请先在工作台保存托管</span>
+              <Button render={<Link href="/dashboard" />} variant="secondary">
+                去工作台创建配置
+              </Button>
+            </CardContent>
+          </Card>
         ) : filteredConfigs.length === 0 ? (
           <Card><CardContent className="p-8 text-muted-foreground">没有匹配的配置</CardContent></Card>
         ) : (
@@ -132,11 +166,11 @@ export function ConfigsClient({ initialConfigs }: { initialConfigs: ConfigRecord
             {filteredConfigs.map((config) => (
               <Card key={config.publicId} className={config.parentId ? "ml-6 border-l-4" : undefined}>
                 <CardHeader className="gap-3 md:grid-cols-[1fr_auto]">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <CardTitle>{config.name}</CardTitle>
-                      {config.parentId && <Badge variant="info"><GitBranchIcon aria-hidden="true" />分支</Badge>}
-                      {config.cloudToken && <Badge variant="success"><CloudIcon aria-hidden="true" />已托管</Badge>}
+                      {config.parentId && <span className="inline-flex items-center gap-1 text-muted-foreground text-xs"><GitBranchIcon aria-hidden="true" className="size-3.5" />分支</span>}
+                      {config.cloudToken && <span className="inline-flex items-center gap-1 text-muted-foreground text-xs"><CloudIcon aria-hidden="true" className="size-3.5" />已托管</span>}
                     </div>
                     <CardDescription>{config.nodeCount || 0} 个节点，更新于 {new Date(config.updatedAt).toLocaleString("zh-CN")}</CardDescription>
                   </div>

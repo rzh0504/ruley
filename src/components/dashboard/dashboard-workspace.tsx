@@ -593,6 +593,8 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
     [nodes, groups, rules, advancedSettings],
   );
   const isGeneratedConfigCurrent = Boolean(generatedConfig && generatedConfigSignature === workspaceSignature);
+  const yamlStatus = !generatedConfig ? "未生成" : isGeneratedConfigCurrent ? "已同步" : "需重新生成";
+  const yamlStatusVariant: "outline" | "success" | "warning" = !generatedConfig ? "outline" : isGeneratedConfigCurrent ? "success" : "warning";
 
   const syncSources = (nextSources: SubscriptionSource[]) => {
     setSources(nextSources);
@@ -931,7 +933,7 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
   return (
     <AppShell>
       <div className="flex flex-col gap-6">
-        <section className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <section className="sticky top-[4.25rem] z-30 flex flex-col gap-3 rounded-xl border bg-background/95 p-3 backdrop-blur md:flex-row md:items-center md:justify-between">
           <div className="flex flex-col gap-1">
             <h1 className="text-3xl font-semibold tracking-tight">
               配置工作台
@@ -970,7 +972,7 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
         </section>
 
         <div className="grid items-stretch gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-          <Card className="h-128 min-h-0">
+          <Card className="min-h-128">
             <CardHeader className="gap-3 md:grid-cols-[1fr_auto]">
               <div className="flex flex-col gap-1">
                 <CardTitle>订阅来源</CardTitle>
@@ -983,7 +985,7 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
                 onChange={updateAdvancedSettings}
               />
             </CardHeader>
-            <CardContent className="min-h-0 flex-1 overflow-auto flex flex-col gap-4">
+            <CardContent className="flex flex-col gap-4">
               <label className="flex flex-col gap-2 text-sm font-medium">
                 配置名称
                 <Input
@@ -1290,6 +1292,7 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
                   </CardDescription>
                 </div>
                 <div className="flex max-w-xl flex-wrap justify-start gap-1.5 md:justify-end">
+                  <Badge variant={yamlStatusVariant}>{yamlStatus}</Badge>
                   <Badge variant="info">节点 {nodes.length}</Badge>
                   <Badge variant="success">代理组 {groups.length}</Badge>
                   <Badge variant="warning">规则 {rules.length}</Badge>
@@ -1378,7 +1381,7 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
         <ProxyGroupManager groups={groups} onGroupsChange={setGroups} />
 
         <div className="grid gap-6">
-          <Card className="h-88 min-h-0">
+          <Card className="min-h-88">
             <CardHeader className="gap-3 md:grid-cols-[1fr_auto]">
               <div className="flex flex-col gap-1">
                 <CardTitle>自定义规则</CardTitle>
@@ -1424,7 +1427,7 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
                 </DialogPopup>
               </Dialog>
             </CardHeader>
-            <CardContent className="min-h-0 flex-1 overflow-auto flex flex-col gap-3">
+            <CardContent className="flex flex-col gap-3">
               {displayedRules.map((rule, index) => (
                 <div
                   key={rule.id}
