@@ -16,6 +16,7 @@ export type JsonSettings = Record<string, unknown>;
 
 export const configs = pgTable("configs", {
   id: serial("id").primaryKey(),
+  publicId: text("public_id").notNull().unique(),
   name: text("name").notNull(),
   urls: text("urls").notNull(),
   platform: text("platform").notNull().default("mihomo"),

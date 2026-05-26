@@ -6,6 +6,7 @@ import { jsonError, requireApiSession } from "@/lib/api/response";
 import {
   buildCurrentConfig,
   buildSubUrl,
+  createConfigPublicId,
   createCloudToken,
   getSubscriptionName,
 } from "@/lib/server/config";
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
     const token = createCloudToken();
     const subUrl = buildSubUrl(token, configName);
     const [row] = await db.insert(configs).values({
+      publicId: createConfigPublicId(),
       name: configName,
       urls: data.urls,
       platform: "mihomo",

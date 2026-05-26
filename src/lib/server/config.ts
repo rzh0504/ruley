@@ -4,11 +4,14 @@ import { generateConfig } from "@/lib/server/generator";
 import { getActiveSubscriptionInput } from "@/lib/subscription-sources";
 
 const tokenBytes = 32;
+const publicIdBytes = 9;
 
 export const getSubscriptionName = (value?: unknown) =>
   typeof value === "string" && value.trim() ? value.trim() : "ruley";
 
 export const createCloudToken = () => crypto.randomBytes(tokenBytes).toString("hex");
+
+export const createConfigPublicId = () => `cfg_${crypto.randomBytes(publicIdBytes).toString("hex")}`;
 
 export const buildSubUrl = (token: string, name?: unknown) =>
   `/api/sub/${token}/${encodeURIComponent(getSubscriptionName(name))}`;

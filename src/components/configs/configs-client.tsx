@@ -11,8 +11,8 @@ import { toastManager } from "@/components/ui/toast";
 
 type ConfigRecord = {
   id: number;
+  publicId: string;
   name: string;
-  urls: string;
   nodeCount: number;
   cloudToken: string | null;
   cloudUrl: string | null;
@@ -20,10 +20,12 @@ type ConfigRecord = {
   updatedAt: string;
 };
 
-export function ConfigsClient() {
+export function ConfigsClient({ initialConfigs }: { initialConfigs: ConfigRecord[] }) {
   const queryClient = useQueryClient();
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["configs"],
+    initialData: initialConfigs,
+    staleTime: 30_000,
     queryFn: async () => {
       const response = await fetch("/api/configs");
       const payload = await response.json();
@@ -32,9 +34,9 @@ export function ConfigsClient() {
     },
   });
 
-  const deleteConfig = async (id: number) => {
+  const deleteConfig = async (publicId: string) => {
     if (!confirm("确定删除这个配置吗？")) return;
-    const response = await fetch(`/api/configs/${id}`, { method: "DELETE" });
+    const response = await fetch(`/api/configs/${publicId}`, { method: "DELETE" });
     const payload = await response.json();
     if (!payload.success) {
       toastManager.add({ type: "error", title: "删除失败", description: payload.error });
@@ -45,7 +47,7 @@ export function ConfigsClient() {
   };
 
   const generateCloud = async (config: ConfigRecord) => {
-    const response = await fetch(`/api/configs/${config.id}/cloud`, { method: "POST" });
+    const response = await fetch(`/api/configs/${config.publicId}/cloud`, { method: "POST" });
     const payload = await response.json();
     if (!payload.success) {
       toastManager.add({ type: "error", title: "生成失败", description: payload.error });
@@ -63,9 +65,7 @@ export function ConfigsClient() {
       <div className="flex flex-col gap-6">
         <section className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div className="flex flex-col gap-1">
-            <Badge variant="info" className="w-fit">Neon Postgres</Badge>
             <h1 className="text-3xl font-semibold tracking-tight">配置管理</h1>
-            <p className="text-muted-foreground">查看、加载、删除和生成云端订阅链接</p>
           </div>
           <Button variant="outline" onClick={() => refetch()}>
             <RefreshCwIcon aria-hidden="true" />
@@ -80,7 +80,7 @@ export function ConfigsClient() {
         ) : (
           <div className="grid gap-4">
             {configs.map((config) => (
-              <Card key={config.id} className={config.parentId ? "ml-6 border-l-4" : undefined}>
+              <Card key={config.publicId} className={config.parentId ? "ml-6 border-l-4" : undefined}>
                 <CardHeader className="gap-3 md:grid-cols-[1fr_auto]">
                   <div className="flex flex-col gap-2">
                     <div className="flex flex-wrap items-center gap-2">
@@ -91,7 +91,7 @@ export function ConfigsClient() {
                     <CardDescription>{config.nodeCount || 0} 个节点，更新于 {new Date(config.updatedAt).toLocaleString("zh-CN")}</CardDescription>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button render={<Link href={`/dashboard?configId=${config.id}`} />} variant="secondary" size="sm">
+                    <Button render={<Link href={`/dashboard?configId=${config.publicId}`} />} variant="secondary" size="sm">
                       <ExternalLinkIcon aria-hidden="true" />
                       加载
                     </Button>
@@ -99,7 +99,7 @@ export function ConfigsClient() {
                       <CloudIcon aria-hidden="true" />
                       链接
                     </Button>
-                    <Button variant="destructive-outline" size="sm" onClick={() => deleteConfig(config.id)}>
+                    <Button variant="destructive-outline" size="sm" onClick={() => deleteConfig(config.publicId)}>
                       <Trash2Icon aria-hidden="true" />
                       删除
                     </Button>

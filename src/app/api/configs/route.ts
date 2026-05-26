@@ -1,9 +1,9 @@
-import { desc, isNull } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { configs } from "@/lib/db/schema";
 import { jsonError, requireApiSession } from "@/lib/api/response";
-import { buildCurrentConfig } from "@/lib/server/config";
+import { buildCurrentConfig, createConfigPublicId } from "@/lib/server/config";
+import { listConfigSummaries, serializeConfigSummary } from "@/lib/server/config-records";
 import { configCreateSchema } from "@/lib/validators/api";
 
 export const runtime = "nodejs";
@@ -13,8 +13,8 @@ export async function GET(request: Request) {
   if (!session) return jsonError("未登录", 401);
 
   try {
-    const rows = await db.select().from(configs).orderBy(isNull(configs.parentId), desc(configs.updatedAt));
-    return NextResponse.json({ success: true, configs: rows });
+    const rows = await listConfigSummaries();
+    return NextResponse.json({ success: true, configs: rows.map(serializeConfigSummary) });
   } catch (error) {
     console.error("[CONFIGS] List error:", error);
     return jsonError("配置列表加载失败", 500);
@@ -31,6 +31,7 @@ export async function POST(request: Request) {
   try {
     const current = await buildCurrentConfig(body.data);
     const [row] = await db.insert(configs).values({
+      publicId: createConfigPublicId(),
       name: body.data.name,
       urls: body.data.urls,
       platform: "mihomo",

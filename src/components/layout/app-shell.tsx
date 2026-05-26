@@ -69,7 +69,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-dvh bg-[linear-gradient(180deg,var(--background),var(--muted))]">
+    <div className="min-h-dvh bg-[linear-gradient(180deg,var(--background),var(--muted))] dark:bg-background">
       <header className="sticky top-0 z-40 border-b bg-background/88 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 lg:px-6">
           <Link href="/dashboard" className="flex items-center gap-3">

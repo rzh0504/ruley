@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { configs } from "@/lib/db/schema";
 import { jsonError, requireApiSession } from "@/lib/api/response";
 import { buildPublicUrl, buildSubUrl, createCloudToken } from "@/lib/server/config";
+import { findConfigByPublicId } from "@/lib/server/config-records";
 
 export const runtime = "nodejs";
 
@@ -11,8 +12,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const session = await requireApiSession(request);
   if (!session) return jsonError("未登录", 401);
 
-  const id = Number((await params).id);
-  const [row] = await db.select().from(configs).where(eq(configs.id, id)).limit(1);
+  const id = (await params).id;
+  const row = await findConfigByPublicId(id);
   if (!row) return jsonError("配置不存在", 404);
 
   const token = row.cloudToken || createCloudToken();
@@ -21,7 +22,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     cloudToken: token,
     cloudUrl: subUrl,
     updatedAt: new Date(),
-  }).where(eq(configs.id, id));
+  }).where(eq(configs.id, row.id));
 
   return NextResponse.json({
     success: true,

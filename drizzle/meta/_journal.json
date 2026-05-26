@@ -29,6 +29,13 @@
       "when": 1779776384358,
       "tag": "0003_repair_config_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1779776384359,
+      "tag": "0004_add_config_public_id",
+      "breakpoints": true
     }
   ]
 }
