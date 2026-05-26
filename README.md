@@ -14,6 +14,7 @@
 - 自定义代理组、规则和高级 DNS
 - 保存配置到本地数据库
 - 生成可访问的订阅托管链接
+- 支持云端订阅自动更新
 - 支持配置分支管理
 
 ## Vercel 部署
@@ -31,6 +32,25 @@ pnpm db:migrate
 
 Vercel 构建命令使用 `pnpm build`。
 
+### Vercel 订阅自动更新
+
+仓库内的 `vercel.json` 会配置 Vercel Cron，每 6 小时调用一次：
+
+```txt
+/api/internal/refresh-subscriptions
+```
+
+如果需要启用主动定时刷新，需要在 Vercel 环境变量中配置：
+
+```txt
+ENABLE_AUTOUPDATE=true
+CRON_SECRET=your-cron-secret
+```
+
+Vercel Cron 调用时会携带 `Authorization: Bearer <CRON_SECRET>`，接口会使用该值鉴权。
+
+如果 `ENABLE_AUTOUPDATE` 不是 `true`，主动定时刷新会保持禁用；订阅客户端访问云端订阅链接时仍会使用现有的懒刷新逻辑。
+
 ## 环境变量
 
 | 变量                      | 说明                | 默认值       |
@@ -45,6 +65,38 @@ Vercel 构建命令使用 `pnpm build`。
 | `SUBSCRIPTION_TIMEOUT_MS` | 单个订阅请求超时时间 | `15000` |
 | `SUBSCRIPTION_CONCURRENCY` | 订阅抓取并发数 | `4` |
 | `SUBSCRIPTION_CACHE_TTL_MS` | 云端订阅生成缓存有效期，刷新失败时会回退到上一次成功生成的 YAML | `300000` |
+| `ENABLE_AUTOUPDATE`       | 是否启用订阅主动定时刷新 | `false` |
+| `CRON_SECRET`             | 订阅主动定时刷新接口鉴权密钥；启用主动刷新时必须设置 | 无 |
+| `REFRESH_INTERVAL_SECONDS` | Docker 定时刷新间隔秒数 | `21600` |
+
+## Docker 部署
+
+`docker-compose.yml` 包含两个服务：
+
+- `ruley`：Web 应用服务
+- `subscription-refresher`：定时调用订阅刷新接口的轻量 sidecar
+
+Docker 部署需要在 `.env` 中至少配置：
+
+```txt
+ADMIN_PASSWORD=your-password
+JWT_SECRET=your-jwt-secret
+DATABASE_URL=postgres://user:password@host:5432/ruley
+NEXT_PUBLIC_APP_URL=https://your-domain.example
+ENABLE_AUTOUPDATE=true
+CRON_SECRET=your-cron-secret
+REFRESH_INTERVAL_SECONDS=21600
+```
+
+如果不需要主动定时刷新，可以保持 `ENABLE_AUTOUPDATE=false`，并且不设置 `CRON_SECRET`。此时 `subscription-refresher` 会保持空闲，不会调用刷新接口。
+
+启动：
+
+```bash
+docker compose up -d
+```
+
+`subscription-refresher` 默认每 6 小时请求一次 `ruley` 容器内的 `/api/internal/refresh-subscriptions`，触发所有已发布云端订阅配置重新拉取上游订阅并更新缓存。即使定时刷新失败，订阅客户端访问云端订阅链接时仍会使用现有的懒刷新逻辑作为兜底。
 
 ## 本地开发
 
