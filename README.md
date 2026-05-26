@@ -22,13 +22,38 @@
 1. 在 Neon 创建 Postgres 数据库并复制 `DATABASE_URL`
 2. 在 Vercel 导入仓库
 3. 配置环境变量
-4. 本地或 CI 执行数据库迁移
+4. 初始化数据库表结构
 
 ```bash
 pnpm install
 pnpm db:generate
 pnpm db:migrate
 ```
+
+如果不想在本地或 CI 连接 Neon 执行迁移，也可以在 Neon 控制台手动执行 SQL。打开 Neon 项目的 SQL Editor，执行下面的初始化脚本：
+
+```sql
+CREATE TABLE IF NOT EXISTS "configs" (
+  "id" serial PRIMARY KEY,
+  "public_id" text NOT NULL UNIQUE,
+  "name" text NOT NULL,
+  "urls" text NOT NULL,
+  "platform" text NOT NULL DEFAULT 'mihomo',
+  "proxy_groups" jsonb NOT NULL DEFAULT '[]'::jsonb,
+  "rules" jsonb NOT NULL DEFAULT '[]'::jsonb,
+  "settings" jsonb NOT NULL DEFAULT '{}'::jsonb,
+  "node_count" integer NOT NULL DEFAULT 0,
+  "parsed_nodes" jsonb,
+  "generated_config" text,
+  "parent_id" integer REFERENCES "configs"("id") ON DELETE CASCADE,
+  "cloud_token" text UNIQUE,
+  "cloud_url" text,
+  "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+  "updated_at" timestamp with time zone NOT NULL DEFAULT now()
+);
+```
+
+这段 SQL 适用于空的 Neon 数据库首次初始化。执行成功后，再把同一个 Neon 数据库的 `DATABASE_URL` 配置到 Vercel 环境变量即可。
 
 Vercel 构建命令使用 `pnpm build`。
 
