@@ -177,13 +177,13 @@ export function DashboardWorkspace() {
           </div>
         </section>
 
-        <div className="grid gap-6 xl:grid-cols-[1.05fr_1fr]">
-          <Card>
+        <div className="grid items-stretch gap-6 xl:grid-cols-[1.05fr_1fr]">
+          <Card className="h-[32rem] min-h-0">
             <CardHeader>
               <CardTitle>订阅来源</CardTitle>
               <CardDescription>支持订阅链接、Base64、YAML 或节点 URI。云部署默认仅允许 HTTPS 订阅。</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col gap-4">
+            <CardContent className="min-h-0 flex-1 overflow-auto flex flex-col gap-4">
               <label className="flex flex-col gap-2 text-sm font-medium">
                 配置名称
                 <Input nativeInput value={name} onChange={(event) => setName(event.target.value)} />
@@ -206,50 +206,40 @@ export function DashboardWorkspace() {
             </CardContent>
           </Card>
 
-          <div className="flex flex-col gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>运行状态</CardTitle>
-                <CardDescription>当前工作区的节点、规则和托管状态。</CardDescription>
+          <div className="min-h-0">
+            <Card className="h-[32rem] min-h-0">
+              <CardHeader className="gap-3 md:grid-cols-[1fr_auto]">
+                <div className="flex flex-col gap-1">
+                  <CardTitle>YAML 预览</CardTitle>
+                  <CardDescription>生成后可下载或保存为云端托管配置。</CardDescription>
+                </div>
+                <div className="flex max-w-xl flex-wrap justify-start gap-1.5 md:justify-end">
+                  <Badge variant="info">节点 {nodes.length}</Badge>
+                  <Badge variant="success">代理组 {groups.length}</Badge>
+                  <Badge variant="warning">规则 {rules.length}</Badge>
+                  {nodes.slice(0, 3).map((node, index) => (
+                    <Badge key={`${String(node.name)}-${index}`} variant="outline">
+                      {String(node.name || "Unnamed")}
+                    </Badge>
+                  ))}
+                  {nodes.length > 3 && <Badge variant="outline">+{nodes.length - 3}</Badge>}
+                </div>
               </CardHeader>
-              <CardContent className="grid gap-3 sm:grid-cols-3">
-                <Metric label="节点" value={nodes.length} />
-                <Metric label="代理组" value={groups.length} />
-                <Metric label="规则" value={rules.length} />
-              </CardContent>
-            </Card>
-
-            {cloudUrl && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>云端订阅链接</CardTitle>
-                  <CardDescription>复制到 Mihomo 客户端使用。</CardDescription>
-                </CardHeader>
-                <CardContent className="flex gap-2">
-                  <Input nativeInput readOnly value={cloudUrl} />
-                  <Button variant="outline" onClick={() => {
-                    navigator.clipboard.writeText(cloudUrl);
-                    toastManager.add({ type: "success", title: "已复制" });
-                  }}>
-                    <CopyIcon aria-hidden="true" />
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-
-            <Card>
-              <CardHeader>
-                <CardTitle>节点摘要</CardTitle>
-                <CardDescription>解析后的前 16 个节点。</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-2">
-                {nodes.slice(0, 16).map((node, index) => (
-                  <div key={`${String(node.name)}-${index}`} className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
-                    <span className="truncate">{String(node.name || "Unnamed")}</span>
-                    <Badge variant="outline">{String(node.type || "proxy")}</Badge>
+              <CardContent className="min-h-0 flex-1 flex flex-col gap-3 overflow-hidden">
+                {cloudUrl && (
+                  <div className="flex shrink-0 gap-2 rounded-xl border bg-background p-2">
+                    <Input nativeInput readOnly value={cloudUrl} />
+                    <Button variant="outline" onClick={() => {
+                      navigator.clipboard.writeText(cloudUrl);
+                      toastManager.add({ type: "success", title: "已复制" });
+                    }}>
+                      <CopyIcon aria-hidden="true" />
+                    </Button>
                   </div>
-                ))}
-                {nodes.length === 0 && <p className="text-muted-foreground text-sm">暂无节点。</p>}
+                )}
+                <pre className="min-h-0 flex-1 overflow-auto rounded-xl bg-muted p-4 text-xs leading-relaxed text-muted-foreground">
+                  {generatedConfig || "尚未生成配置。"}
+                </pre>
               </CardContent>
             </Card>
           </div>
@@ -257,13 +247,13 @@ export function DashboardWorkspace() {
 
         <ProxyGroupManager groups={groups} onGroupsChange={setGroups} />
 
-        <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-          <Card>
+        <div className="grid gap-6">
+          <Card className="h-[30rem] min-h-0">
             <CardHeader>
               <CardTitle>自定义规则</CardTitle>
               <CardDescription>添加优先级高于兜底规则的手动分流项。</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col gap-3">
+            <CardContent className="min-h-0 flex-1 overflow-auto flex flex-col gap-3">
               {rules.map((rule, index) => (
                 <div key={rule.id} className="grid gap-2 rounded-xl border p-3 lg:grid-cols-[1fr_1.4fr_1.4fr_auto]">
                   <StringSelect items={ruleTypes.map((type) => ({ label: type, value: type }))} value={rule.type} onChange={(value) => {
@@ -287,29 +277,8 @@ export function DashboardWorkspace() {
               <Button variant="outline" onClick={() => setRules([...rules, { id: crypto.randomUUID(), type: "DOMAIN-SUFFIX", value: "", policy: policies[0] || "DIRECT" }])}>添加规则</Button>
             </CardContent>
           </Card>
-
-          <Card className="min-h-[36rem]">
-            <CardHeader>
-              <CardTitle>YAML 预览</CardTitle>
-              <CardDescription>生成后可下载或保存为云端托管配置。</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <pre className="max-h-[34rem] overflow-auto rounded-xl bg-muted p-4 text-xs leading-relaxed text-muted-foreground">
-                {generatedConfig || "尚未生成配置。"}
-              </pre>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </AppShell>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-xl border p-4">
-      <div className="text-muted-foreground text-sm">{label}</div>
-      <div className="mt-1 text-2xl font-semibold">{value}</div>
-    </div>
   );
 }

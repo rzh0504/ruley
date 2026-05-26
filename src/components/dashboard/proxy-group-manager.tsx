@@ -164,7 +164,7 @@ export function ProxyGroupManager({
   };
 
   return (
-    <Card>
+    <Card className="h-[44rem] min-h-0">
       <CardHeader className="gap-3 md:grid-cols-[1fr_auto]">
         <div className="flex flex-col gap-1">
           <CardTitle>代理组管理</CardTitle>
@@ -181,8 +181,8 @@ export function ProxyGroupManager({
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="grid gap-4 lg:grid-cols-[18rem_1fr]">
-        <aside className="flex max-h-[36rem] flex-col gap-2 overflow-auto rounded-xl border bg-muted/40 p-2">
+      <CardContent className="min-h-0 flex-1 grid gap-4 overflow-hidden lg:grid-cols-[18rem_1fr]">
+        <aside className="min-h-0 h-full overflow-auto flex flex-col gap-2 rounded-xl border bg-muted/40 p-2">
           {groups.map((group) => (
             <button
               key={group.id}
@@ -223,7 +223,7 @@ export function ProxyGroupManager({
             onReset={() => resetPreset(selectedGroup)}
           />
         ) : (
-          <div className="flex min-h-80 items-center justify-center rounded-xl border text-muted-foreground">请选择或添加代理组。</div>
+          <div className="flex h-full min-h-0 items-center justify-center rounded-xl border text-muted-foreground">请选择或添加代理组。</div>
         )}
       </CardContent>
     </Card>
@@ -232,7 +232,7 @@ export function ProxyGroupManager({
 
 function PresetPicker({ activeIds, onToggle }: { activeIds: Set<string>; onToggle: (template: ProxyGroupTemplate) => void }) {
   return (
-    <section className="grid max-h-[36rem] gap-3 overflow-auto pr-1 md:grid-cols-2">
+    <section className="h-full min-h-0 overflow-auto grid content-start gap-3 pr-1 md:grid-cols-2">
       {PROXY_GROUP_TEMPLATES.map((template) => {
         const active = activeIds.has(template.id);
         return (
@@ -268,7 +268,7 @@ function CustomGroupForm({
   onCreate: () => void;
 }) {
   return (
-    <section className="flex flex-col gap-4 rounded-xl border p-4">
+    <section className="h-full min-h-0 overflow-auto flex flex-col gap-4 rounded-xl border p-4">
       <div className="grid gap-3 md:grid-cols-[5rem_1fr]">
         <label className="flex flex-col gap-2 text-sm font-medium">
           图标
@@ -332,7 +332,7 @@ function GroupEditor({
   const lockedType = group.id === "1" || group.id === "2" || group.id === "24";
 
   return (
-    <section className="flex flex-col gap-4 rounded-xl border p-4">
+    <section className="h-full min-h-0 overflow-auto flex flex-col gap-4 rounded-xl border p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
