@@ -75,6 +75,8 @@ import {
   getStoredProxyGroupPreferences,
   normalizeAdvancedSettings,
   serializeAdvancedSettings,
+  clearStoredDashboardHref,
+  setStoredDashboardHref,
   type AdvancedSettings,
   type ProxyGroupPreferences,
 } from "@/lib/preferences";
@@ -188,7 +190,7 @@ const getInitialWorkspaceState = (config?: ConfigRecord | null) => {
 
   return {
     currentConfigId: config?.id ?? null,
-    name: config?.name || "ruley",
+    name: config?.name || "",
     urls,
     sources: parseSubscriptionSources(urls),
     nodes: config?.parsedNodes || [],
@@ -607,6 +609,9 @@ export function DashboardWorkspace({
   const [currentConfigId, setCurrentConfigId] = useState<number | null>(
     initialState.currentConfigId,
   );
+  const [isConfigNameReady, setIsConfigNameReady] = useState(
+    Boolean(initialConfig || searchParams.get("configId")),
+  );
   const [visibleRuleCount, setVisibleRuleCount] = useState(
     initialVisibleRuleCount,
   );
@@ -629,30 +634,64 @@ export function DashboardWorkspace({
   >({});
 
   useEffect(() => {
+    const id = searchParams.get("configId") || initialConfig?.publicId;
+    if (id) {
+      setStoredDashboardHref(`/dashboard?configId=${id}`);
+      return;
+    }
+    clearStoredDashboardHref();
+  }, [initialConfig?.publicId, searchParams]);
+
+  useEffect(() => {
     if (initialConfig || searchParams.get("configId")) return;
+    setIsConfigNameReady(false);
     let cancelled = false;
     const appearancePreferences = getStoredAppearancePreferences();
     const proxyGroupPreferences = getStoredProxyGroupPreferences();
     const advancedDefaults = getStoredDefaultAdvancedSettings();
+    const nextGroups = defaultGroups(proxyGroupPreferences);
+    setCurrentConfigId(null);
+    setUrls("");
+    setSources(parseSubscriptionSources(""));
+    setNodes([]);
+    setRules([]);
+    setGeneratedConfig("");
+    setGeneratedConfigSignature("");
+    setCloudUrl("");
+    setVisibleRuleCount(initialVisibleRuleCount);
+    setParseErrors([]);
+    setParseDiagnostics([]);
+    setValidationIssues([]);
+    setSourcePreview(null);
+    setSourcePreviewCache({});
     setAdvancedSettings({
       ...advancedDefaults,
       testUrl: proxyGroupPreferences.defaultTestUrl,
       testInterval: proxyGroupPreferences.defaultTestInterval,
     });
-    setGroups(defaultGroups(proxyGroupPreferences));
+    setGroups(nextGroups);
     setCollapsedYamlSections(new Set(appearancePreferences.defaultCollapsedYamlSections));
 
     fetch("/api/configs")
       .then((response) => response.json())
       .then((payload) => {
-        if (cancelled || !payload.success) return;
+        if (cancelled) return;
+        if (!payload.success) {
+          setName(createNextConfigName(appearancePreferences.defaultConfigNamePrefix, []));
+          setIsConfigNameReady(true);
+          return;
+        }
         const existingNames = Array.isArray(payload.configs)
           ? payload.configs.map((config: { name?: string }) => String(config.name || ""))
           : [];
         setName(createNextConfigName(appearancePreferences.defaultConfigNamePrefix, existingNames));
+        setIsConfigNameReady(true);
       })
       .catch(() => {
-        if (!cancelled) setName(createNextConfigName(appearancePreferences.defaultConfigNamePrefix, []));
+        if (!cancelled) {
+          setName(createNextConfigName(appearancePreferences.defaultConfigNamePrefix, []));
+          setIsConfigNameReady(true);
+        }
       });
 
     return () => {
@@ -700,6 +739,7 @@ export function DashboardWorkspace({
 
   const applyConfig = (config: ConfigRecord) => {
     const nextState = getInitialWorkspaceState(config);
+    setIsConfigNameReady(true);
     setCurrentConfigId(nextState.currentConfigId);
     setName(nextState.name);
     setUrls(nextState.urls);
@@ -1090,8 +1130,10 @@ export function DashboardWorkspace({
                 配置名称
                 <Input
                   nativeInput
-                  value={name}
+                  value={isConfigNameReady ? name : ""}
                   onChange={(event) => setName(event.target.value)}
+                  placeholder={isConfigNameReady ? undefined : "正在生成配置名称"}
+                  disabled={!isConfigNameReady}
                 />
               </label>
               <div className="flex flex-col gap-3">

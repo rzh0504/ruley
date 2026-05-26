@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type React from "react";
-import { LaptopIcon, MoonIcon, PanelsTopLeftIcon, ServerCogIcon, SettingsIcon, SunIcon } from "lucide-react";
+import { LaptopIcon, MoonIcon, PanelsTopLeftIcon, PlusIcon, ServerCogIcon, SettingsIcon, SunIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   applyTheme,
+  getStoredDashboardHref,
   getStoredThemeMode,
   setStoredThemeMode,
   themeLabels,
@@ -30,6 +31,7 @@ const navItems = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [dashboardHref, setDashboardHref] = useState("/dashboard");
   const [themeMode, setThemeMode] = useState<ThemeMode>("system");
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
 
@@ -43,11 +45,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       if ((localStorage.getItem(themeStorageKey) || "system") === "system") applyTheme("system");
     };
     const handlePreferencesChange = () => setThemeMode(getStoredThemeMode());
+    const handleDashboardHrefChange = () => setDashboardHref(getStoredDashboardHref());
+    setDashboardHref(getStoredDashboardHref());
     media.addEventListener("change", handleSystemThemeChange);
     window.addEventListener("ruley-preferences-change", handlePreferencesChange);
+    window.addEventListener("ruley-preferences-change", handleDashboardHrefChange);
     return () => {
       media.removeEventListener("change", handleSystemThemeChange);
       window.removeEventListener("ruley-preferences-change", handlePreferencesChange);
+      window.removeEventListener("ruley-preferences-change", handleDashboardHrefChange);
     };
   }, []);
 
@@ -61,7 +67,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-dvh bg-[linear-gradient(180deg,var(--background),var(--muted))] dark:bg-background">
       <header className="sticky top-0 z-40 border-b bg-background/88 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 lg:px-6">
-          <Link href="/dashboard" className="flex items-center gap-3">
+          <Link href={dashboardHref} className="flex items-center gap-3">
             <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground font-semibold">R</div>
             <div className="flex flex-col leading-tight">
               <span className="font-semibold">Ruley</span>
@@ -72,8 +78,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = pathname === item.href;
+              const href = item.href === "/dashboard" ? dashboardHref : item.href;
               return (
-                <Button key={item.href} render={<Link href={item.href} />} variant={active ? "secondary" : "ghost"} size="sm">
+                <Button key={item.href} render={<Link href={href} />} variant={active ? "secondary" : "ghost"} size="sm">
                   <Icon aria-hidden="true" />
                   {item.label}
                 </Button>
@@ -81,6 +88,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
           <div className="flex items-center gap-2">
+            <Button render={<Link href="/dashboard" />} variant="outline" size="sm">
+              <PlusIcon aria-hidden="true" />
+              新建配置
+            </Button>
             <Menu modal={false} open={themeMenuOpen} onOpenChange={setThemeMenuOpen}>
               <MenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`当前主题：${themeLabels[themeMode]}`} title={`当前主题：${themeLabels[themeMode]}`} />}>
                 {themeMode === "system" ? <LaptopIcon aria-hidden="true" /> : themeMode === "dark" ? <MoonIcon aria-hidden="true" /> : <SunIcon aria-hidden="true" />}
@@ -102,10 +113,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <nav className="mx-auto flex max-w-7xl gap-2 px-4 pb-3 md:hidden">
           {navItems.map((item) => {
             const Icon = item.icon;
+            const href = item.href === "/dashboard" ? dashboardHref : item.href;
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={href}
                 className={cn("flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm", pathname === item.href ? "bg-secondary" : "text-muted-foreground")}
               >
                 <Icon aria-hidden="true" className="size-4" />

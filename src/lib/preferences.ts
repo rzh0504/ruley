@@ -39,6 +39,7 @@ export const defaultAdvancedSettingsStorageKey = "ruley-default-advanced-setting
 export const parserPreferencesStorageKey = "ruley-parser-preferences";
 export const proxyGroupPreferencesStorageKey = "ruley-proxy-group-preferences";
 export const appearancePreferencesStorageKey = "ruley-appearance-preferences";
+export const lastDashboardHrefStorageKey = "ruley-last-dashboard-href";
 
 export const defaultEnabledGroupIds = ["1", "2", "3", "6", "25", "23"];
 export const defaultTestUrl = "https://www.gstatic.com/generate_204";
@@ -296,4 +297,23 @@ export function createNextConfigName(prefix: string, existingNames: string[]): s
   let next = 1;
   while (usedNumbers.has(next)) next += 1;
   return `${normalizedPrefix}_${next}`;
+}
+
+export function getStoredDashboardHref(): string {
+  if (typeof window === "undefined") return "/dashboard";
+  const stored = localStorage.getItem(lastDashboardHrefStorageKey);
+  return stored?.startsWith("/dashboard") ? stored : "/dashboard";
+}
+
+export function setStoredDashboardHref(href: string) {
+  if (typeof window === "undefined") return;
+  if (!href.startsWith("/dashboard")) return;
+  localStorage.setItem(lastDashboardHrefStorageKey, href);
+  window.dispatchEvent(new Event("ruley-preferences-change"));
+}
+
+export function clearStoredDashboardHref() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(lastDashboardHrefStorageKey);
+  window.dispatchEvent(new Event("ruley-preferences-change"));
 }

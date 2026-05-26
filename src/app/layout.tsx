@@ -13,9 +13,20 @@ export const metadata: Metadata = {
   description: "解析订阅、整理节点规则并生成 Mihomo 配置的 Web 工具",
 };
 
+const themeInitScript = `
+try {
+  var mode = localStorage.getItem('ruley-theme') || 'system';
+  var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.classList.toggle('dark', mode === 'dark' || (mode === 'system' && prefersDark));
+} catch (_) {}
+`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className={`${inter.variable} ${interHeading.variable} ${geistMono.variable} isolate min-h-screen bg-background font-sans text-foreground antialiased`}>
         <Providers>{children}</Providers>
       </body>
