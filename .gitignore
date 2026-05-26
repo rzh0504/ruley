@@ -1,11 +1,15 @@
 node_modules/
+.next/
+.next-dev/
 build/
 dist/
 server.cjs
 coverage/
+tsconfig.tsbuildinfo
 .DS_Store
 *.log
 .env*
 !.env.example
 data/
 config.yaml
+.agents
