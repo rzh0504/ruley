@@ -609,6 +609,7 @@ export function DashboardWorkspace({
   const [currentConfigId, setCurrentConfigId] = useState<number | null>(
     initialState.currentConfigId,
   );
+  const [pendingBranchParentId, setPendingBranchParentId] = useState<number | null>(null);
   const [isConfigNameReady, setIsConfigNameReady] = useState(
     Boolean(initialConfig || searchParams.get("configId")),
   );
@@ -651,6 +652,7 @@ export function DashboardWorkspace({
     const advancedDefaults = getStoredDefaultAdvancedSettings();
     const nextGroups = defaultGroups(proxyGroupPreferences);
     setCurrentConfigId(null);
+    setPendingBranchParentId(null);
     setUrls("");
     setSources(parseSubscriptionSources(""));
     setNodes([]);
@@ -739,8 +741,10 @@ export function DashboardWorkspace({
 
   const applyConfig = (config: ConfigRecord) => {
     const nextState = getInitialWorkspaceState(config);
+    const appearancePreferences = getStoredAppearancePreferences();
     setIsConfigNameReady(true);
     setCurrentConfigId(nextState.currentConfigId);
+    setPendingBranchParentId(null);
     setName(nextState.name);
     setUrls(nextState.urls);
     setSources(nextState.sources);
@@ -761,6 +765,7 @@ export function DashboardWorkspace({
     );
     setCloudUrl(nextState.cloudUrl);
     setVisibleRuleCount(initialVisibleRuleCount);
+    setCollapsedYamlSections(new Set(appearancePreferences.defaultCollapsedYamlSections));
     setParseErrors([]);
     setParseDiagnostics([]);
     setValidationIssues([]);
@@ -1006,7 +1011,16 @@ export function DashboardWorkspace({
       toastManager.add({ type: "success", title: "YAML 已生成" });
     });
 
-  const saveCloud = (parentId?: number) =>
+  const createBranchDraft = () => {
+    if (!currentConfigId) return;
+    setPendingBranchParentId(currentConfigId);
+    setCurrentConfigId(null);
+    setCloudUrl("");
+    setName((current) => `${current || "ruley"} 分支`);
+    toastManager.add({ type: "success", title: "分支草稿已创建" });
+  };
+
+  const saveCloud = () =>
     startTransition(async () => {
       if (!urls.trim()) {
         toastManager.add({ type: "warning", title: "请先填写订阅来源" });
@@ -1025,14 +1039,15 @@ export function DashboardWorkspace({
         });
         return;
       }
+      const branchParentId = pendingBranchParentId || undefined;
       const response = await fetch("/api/cloud-save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           urls,
-          configId: parentId ? undefined : currentConfigId,
-          parentId,
-          name: parentId ? `${name} 分支` : name,
+          configId: branchParentId ? undefined : currentConfigId,
+          parentId: branchParentId,
+          name,
           proxyGroups: groups,
           rules,
           settings: serializeAdvancedSettings(advancedSettings),
@@ -1052,10 +1067,11 @@ export function DashboardWorkspace({
         return;
       }
       setCurrentConfigId(Number(data.configId));
+      setPendingBranchParentId(null);
       setCloudUrl(window.location.origin + data.subUrl);
       toastManager.add({
         type: "success",
-        title: parentId ? "分支已创建" : "配置已托管",
+        title: branchParentId ? "分支已托管" : "配置已托管",
       });
     });
 
@@ -1085,25 +1101,17 @@ export function DashboardWorkspace({
               生成 YAML
             </Button>
             <Button
-              variant="outline"
-              onClick={downloadYaml}
-              disabled={!generatedConfig}
-            >
-              <DownloadIcon aria-hidden="true" />
-              下载
-            </Button>
-            <Button
               variant="secondary"
               onClick={() => saveCloud()}
               loading={isPending}
             >
               <SaveIcon aria-hidden="true" />
-              {currentConfigId ? "更新托管" : "保存托管"}
+              {pendingBranchParentId ? "托管分支" : currentConfigId ? "更新托管" : "保存托管"}
             </Button>
             <Button
               variant="outline"
-              onClick={() => currentConfigId && saveCloud(currentConfigId)}
-              disabled={!currentConfigId}
+              onClick={createBranchDraft}
+              disabled={!currentConfigId || Boolean(pendingBranchParentId)}
             >
               <GitForkIcon aria-hidden="true" />
               创建分支
@@ -1455,7 +1463,32 @@ export function DashboardWorkspace({
                     </Button>
                   </div>
                 )}
-                <div className="min-h-0 max-h-full flex-1 overflow-auto rounded-xl bg-muted p-3 text-xs leading-relaxed">
+                <div className="relative min-h-0 max-h-full flex-1 overflow-auto rounded-xl bg-muted p-3 text-xs leading-relaxed">
+                  {generatedConfig && (
+                    <div className="sticky top-0 z-10 ml-auto flex w-fit gap-1 rounded-lg border bg-background/92 p-1 shadow-xs backdrop-blur">
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label="复制 YAML"
+                        title="复制 YAML"
+                        onClick={() => {
+                          navigator.clipboard.writeText(generatedConfig);
+                          toastManager.add({ type: "success", title: "YAML 已复制" });
+                        }}
+                      >
+                        <CopyIcon aria-hidden="true" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label="下载 YAML"
+                        title="下载 YAML"
+                        onClick={downloadYaml}
+                      >
+                        <DownloadIcon aria-hidden="true" />
+                      </Button>
+                    </div>
+                  )}
                   {generatedConfig ? (
                     <div className="flex flex-col gap-2">
                       {yamlBlocks.map((block) => {
