@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "coss": {
+      "source": "cosscom/coss",
+      "sourceType": "github",
+      "skillPath": "apps/ui/skills/coss/SKILL.md",
+      "computedHash": "f2194c2092cdfd1f73f329a9d942f8b91822037003098e2293acb89735994298"
+    },
+    "coss-particles": {
+      "source": "cosscom/coss",
+      "sourceType": "github",
+      "skillPath": "apps/ui/skills/coss-particles/SKILL.md",
+      "computedHash": "189b06158600d157cf08da5915dda370732dde4e949aff4baabb7f37349d4fdd"
+    }
+  }
+}
