@@ -1014,10 +1014,7 @@ export function DashboardWorkspace() {
                                       )}
                                     </div>
                                     {sourcePreview.diagnostics.length > 0 && (
-                                      <div className="grid gap-2 rounded-lg border bg-muted/30 p-2">
-                                        <div className="text-xs text-muted-foreground">
-                                          解析后已自动完成节点去重、同名重命名与名称归一化。
-                                        </div>
+                                      <div className="grid gap-2">
                                         {sourcePreview.diagnostics.map(
                                           (diagnostic, diagnosticIndex) => (
                                             <div
