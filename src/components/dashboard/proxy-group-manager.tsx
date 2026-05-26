@@ -486,19 +486,19 @@ function GroupEditor({
   return (
     <section className="h-full min-h-0 overflow-auto flex flex-col gap-4 rounded-xl border p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2">
             <Badge variant={preset ? "info" : "default"}>
               {preset ? "预设" : "自定义"}
             </Badge>
-            {group.dialerProxy && (
-              <Badge variant="warning">
-                <GitBranchIcon aria-hidden="true" />
-                链式代理
-              </Badge>
-            )}
+            <p className="text-muted-foreground text-sm">{group.desc}</p>
           </div>
-          <p className="text-muted-foreground text-sm">{group.desc}</p>
+          {group.dialerProxy && (
+            <Badge variant="warning" className="w-fit">
+              <GitBranchIcon aria-hidden="true" />
+              链式代理
+            </Badge>
+          )}
         </div>
         <div className="flex gap-2">
           {preset && (

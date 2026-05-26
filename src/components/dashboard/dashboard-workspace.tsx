@@ -4,6 +4,10 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   AlertTriangleIcon,
+  ArrowDownIcon,
+  ArrowUpIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
   CopyIcon,
   DownloadIcon,
   GitForkIcon,
@@ -23,6 +27,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogPanel,
+  DialogPopup,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -52,6 +67,13 @@ type ValidationIssue = {
   severity: "error" | "warning";
   message: string;
 };
+type YamlBlock = {
+  key: string;
+  label: string;
+  content: string;
+  count: number;
+  foldable: boolean;
+};
 type ConfigRecord = {
   id: number;
   name: string;
@@ -74,10 +96,23 @@ const ruleTypes = [
   "DOMAIN-SUFFIX",
   "DOMAIN",
   "DOMAIN-KEYWORD",
+  "DOMAIN-REGEX",
   "IP-CIDR",
+  "IP-CIDR6",
   "GEOIP",
+  "PROCESS-NAME",
+  "PROCESS-PATH",
+  "SRC-IP-CIDR",
+  "DST-PORT",
+  "SRC-PORT",
   "MATCH",
 ];
+
+const yamlFoldableSections = new Map([
+  ["proxies", "proxies"],
+  ["proxy-groups", "proxy-groups"],
+  ["rules", "rules"],
+]);
 
 const isComplexRegex = (value: string) =>
   value.length > 120 || /\([^)]*[+*][^)]*\)[+*?{]/.test(value);
@@ -165,10 +200,102 @@ const validateWorkspace = ({
   return issues;
 };
 
-const formatParseError = (error: ParseErrorRecord) => {
-  const source = error.url || error.input;
-  return source ? `${source}: ${error.error || "解析失败"}` : error.error || "解析失败";
+const getYamlBlocks = (yamlText: string): YamlBlock[] => {
+  const lines = yamlText.split("\n");
+  const blocks: YamlBlock[] = [];
+  let currentKey = "root";
+  let currentLines: string[] = [];
+
+  const pushCurrent = () => {
+    if (currentLines.length === 0) return;
+    const foldable = yamlFoldableSections.has(currentKey);
+    blocks.push({
+      key: currentKey,
+      label: yamlFoldableSections.get(currentKey) || currentKey,
+      content: currentLines.join("\n"),
+      count: currentLines.filter((line) => /^\s*-\s/.test(line)).length,
+      foldable,
+    });
+  };
+
+  for (const line of lines) {
+    const topLevel = line.match(/^([A-Za-z0-9_-]+):/);
+    if (topLevel) {
+      pushCurrent();
+      currentKey = topLevel[1];
+      currentLines = [line];
+    } else {
+      currentLines.push(line);
+    }
+  }
+  pushCurrent();
+
+  return blocks.filter((block) => block.content.trim());
 };
+
+const parseRuleLine = (line: string, fallbackPolicy: string): RuleItem | null => {
+  const parts = line.split(",").map((part) => part.trim()).filter(Boolean);
+  if (parts.length < 2) return null;
+  const [type, valueOrPolicy, policy] = parts;
+  if (!ruleTypes.includes(type)) return null;
+  if (type === "MATCH") {
+    return {
+      id: crypto.randomUUID(),
+      type,
+      value: "",
+      policy: valueOrPolicy || fallbackPolicy,
+    };
+  }
+  if (!valueOrPolicy) return null;
+  return {
+    id: crypto.randomUUID(),
+    type,
+    value: valueOrPolicy,
+    policy: policy || fallbackPolicy,
+  };
+};
+
+function HighlightedYaml({
+  content,
+  compact = false,
+}: {
+  content: string;
+  compact?: boolean;
+}) {
+  return (
+    <pre className={`overflow-auto p-3 font-mono ${compact ? "max-h-96" : ""}`}>
+      {content.split("\n").map((line, index) => {
+        const keyMatch = line.match(/^(\s*)([A-Za-z0-9_-]+):(.*)$/);
+        const listMatch = line.match(/^(\s*-\s)([A-Za-z0-9_-]+):(.*)$/);
+        if (listMatch) {
+          return (
+            <div key={`${line}-${index}`}>
+              <span className="text-muted-foreground">{listMatch[1]}</span>
+              <span className="text-info-foreground">{listMatch[2]}</span>
+              <span className="text-muted-foreground">:</span>
+              <span className="text-foreground">{listMatch[3]}</span>
+            </div>
+          );
+        }
+        if (keyMatch) {
+          return (
+            <div key={`${line}-${index}`}>
+              <span>{keyMatch[1]}</span>
+              <span className="text-info-foreground">{keyMatch[2]}</span>
+              <span className="text-muted-foreground">:</span>
+              <span className="text-foreground">{keyMatch[3]}</span>
+            </div>
+          );
+        }
+        return (
+          <div key={`${line}-${index}`} className="text-muted-foreground">
+            {line || " "}
+          </div>
+        );
+      })}
+    </pre>
+  );
+}
 
 export function DashboardWorkspace() {
   const searchParams = useSearchParams();
@@ -186,6 +313,8 @@ export function DashboardWorkspace() {
   const [parseErrors, setParseErrors] = useState<ParseErrorRecord[]>([]);
   const [parseDiagnostics, setParseDiagnostics] = useState<ParseDiagnostic[]>([]);
   const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
+  const [collapsedYamlSections, setCollapsedYamlSections] = useState<Set<string>>(new Set());
+  const [bulkRulesText, setBulkRulesText] = useState("");
 
   const policies = useMemo(
     () => [
@@ -224,6 +353,47 @@ export function DashboardWorkspace() {
 
   const removeSource = (id: string) => {
     syncSources(sources.filter((source) => source.id !== id));
+  };
+
+  const yamlBlocks = useMemo(
+    () => getYamlBlocks(generatedConfig),
+    [generatedConfig],
+  );
+
+  const toggleYamlSection = (key: string) => {
+    const next = new Set(collapsedYamlSections);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    setCollapsedYamlSections(next);
+  };
+
+  const moveRule = (index: number, direction: -1 | 1) => {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= rules.length) return;
+    const next = [...rules];
+    [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+    setRules(next);
+  };
+
+  const importBulkRules = () => {
+    const imported = bulkRulesText
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => parseRuleLine(line, policies[0] || "DIRECT"))
+      .filter((rule): rule is RuleItem => Boolean(rule));
+
+    if (imported.length === 0) {
+      toastManager.add({ type: "warning", title: "没有可导入的规则" });
+      return;
+    }
+    setRules([...rules, ...imported]);
+    setBulkRulesText("");
+    toastManager.add({
+      type: "success",
+      title: "规则已导入",
+      description: `新增 ${imported.length} 条规则`,
+    });
   };
 
   useEffect(() => {
@@ -474,10 +644,9 @@ export function DashboardWorkspace() {
                             aria-label={`订阅源 ${index + 1} 名称`}
                           />
                           <Button
-                            variant="ghost"
+                            variant="destructive-outline"
                             size="icon"
                             onClick={() => removeSource(source.id)}
-                            disabled={sources.length <= 1}
                           >
                             <Trash2Icon aria-hidden="true" />
                           </Button>
@@ -541,25 +710,45 @@ export function DashboardWorkspace() {
                   )}
                   {parseErrors.length > 0 && (
                     <div className="flex flex-col gap-2">
-                      <div className="text-muted-foreground text-xs">解析错误</div>
+                      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                        <span>解析错误</span>
+                        <Badge variant="error">{parseErrors.length}</Badge>
+                      </div>
                       {parseErrors.map((error, index) => (
                         <div
                           key={`parse-error-${index}`}
-                          className="rounded-lg border border-error/30 bg-error/8 p-2 text-sm"
+                          className="grid gap-1 rounded-lg border border-destructive/30 bg-destructive/8 p-2 text-sm"
                         >
-                          {formatParseError(error)}
+                          {(error.url || error.input) && (
+                            <code className="break-all text-xs text-muted-foreground">
+                              {error.url || error.input}
+                            </code>
+                          )}
+                          <span>{error.error || "解析失败"}</span>
                         </div>
                       ))}
                     </div>
                   )}
                   {parseDiagnostics.length > 0 && (
                     <div className="flex flex-col gap-2">
-                      <div className="text-muted-foreground text-xs">解析处理</div>
+                      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                        <span>解析处理</span>
+                        <Badge variant="outline">{parseDiagnostics.length}</Badge>
+                      </div>
                       {parseDiagnostics.map((diagnostic, index) => (
                         <div
                           key={`parse-diagnostic-${index}`}
-                          className="rounded-lg border bg-background p-2 text-sm text-muted-foreground"
+                          className="flex items-start gap-2 rounded-lg border bg-background p-2 text-sm text-muted-foreground"
                         >
+                          <Badge
+                            variant={diagnostic.type === "duplicate" ? "warning" : "outline"}
+                          >
+                            {diagnostic.type === "duplicate"
+                              ? "去重"
+                              : diagnostic.type === "renamed"
+                                ? "重命名"
+                                : "跳过"}
+                          </Badge>
                           {diagnostic.message}
                         </div>
                       ))}
@@ -611,9 +800,41 @@ export function DashboardWorkspace() {
                     </Button>
                   </div>
                 )}
-                <pre className="min-h-0 flex-1 overflow-auto rounded-xl bg-muted p-4 text-xs leading-relaxed text-muted-foreground">
-                  {generatedConfig || "尚未生成配置"}
-                </pre>
+                <div className="min-h-0 flex-1 overflow-auto rounded-xl bg-muted p-3 text-xs leading-relaxed">
+                  {generatedConfig ? (
+                    <div className="flex flex-col gap-2">
+                      {yamlBlocks.map((block) => {
+                        const collapsed = collapsedYamlSections.has(block.key);
+                        return (
+                          <section key={block.key} className="rounded-lg border bg-background/72">
+                            {block.foldable ? (
+                              <button
+                                type="button"
+                                onClick={() => toggleYamlSection(block.key)}
+                                className="flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left"
+                              >
+                                <span className="flex items-center gap-2 font-medium">
+                                  {collapsed ? (
+                                    <ChevronRightIcon className="size-4" aria-hidden="true" />
+                                  ) : (
+                                    <ChevronDownIcon className="size-4" aria-hidden="true" />
+                                  )}
+                                  {block.label}
+                                </span>
+                                <Badge variant="outline">{block.count}</Badge>
+                              </button>
+                            ) : null}
+                            {!collapsed && (
+                              <HighlightedYaml content={block.content} compact={block.foldable} />
+                            )}
+                          </section>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-muted-foreground">尚未生成配置</div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -623,18 +844,71 @@ export function DashboardWorkspace() {
 
         <div className="grid gap-6">
           <Card className="h-88 min-h-0">
-            <CardHeader>
-              <CardTitle>自定义规则</CardTitle>
-              <CardDescription>
-                添加优先级高于兜底规则的手动分流项
-              </CardDescription>
+            <CardHeader className="gap-3 md:grid-cols-[1fr_auto]">
+              <div className="flex flex-col gap-1">
+                <CardTitle>自定义规则</CardTitle>
+                <CardDescription>
+                  添加优先级高于兜底规则的手动分流项
+                </CardDescription>
+              </div>
+              <Dialog>
+                <DialogTrigger render={<Button variant="outline" size="sm" />}>
+                  批量导入
+                </DialogTrigger>
+                <DialogPopup>
+                  <DialogHeader>
+                    <DialogTitle>批量导入规则</DialogTitle>
+                    <DialogDescription>
+                      每行一条规则，格式为 TYPE,value,policy；MATCH 使用 MATCH,policy。
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogPanel>
+                    <Textarea
+                      value={bulkRulesText}
+                      onChange={(event) => setBulkRulesText(event.target.value)}
+                      placeholder="DOMAIN-SUFFIX,example.com,DIRECT&#10;DOMAIN-KEYWORD,openai,🚀 节点选择&#10;MATCH,🐟 漏网之鱼"
+                      className="min-h-48 font-mono text-xs"
+                    />
+                  </DialogPanel>
+                  <DialogFooter>
+                    <DialogClose render={<Button variant="ghost" />}>
+                      取消
+                    </DialogClose>
+                    <DialogClose
+                      render={
+                        <Button disabled={!bulkRulesText.trim()} onClick={importBulkRules} />
+                      }
+                    >
+                      导入规则
+                    </DialogClose>
+                  </DialogFooter>
+                </DialogPopup>
+              </Dialog>
             </CardHeader>
             <CardContent className="min-h-0 flex-1 overflow-auto flex flex-col gap-3">
               {rules.map((rule, index) => (
                 <div
                   key={rule.id}
-                  className="grid gap-2 rounded-xl border p-3 lg:grid-cols-[1fr_1.4fr_1.4fr_auto]"
+                  className="grid items-start gap-2 rounded-xl border p-3 lg:grid-cols-[auto_1fr_1.4fr_1.4fr_auto]"
                 >
+                  <div className="flex gap-1 pt-0.5">
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={() => moveRule(index, -1)}
+                      disabled={index === 0}
+                    >
+                      <ArrowUpIcon aria-hidden="true" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={() => moveRule(index, 1)}
+                      disabled={index === rules.length - 1}
+                    >
+                      <ArrowDownIcon aria-hidden="true" />
+                    </Button>
+                  </div>
                   <StringSelect
                     items={ruleTypes.map((type) => ({
                       label: type,
@@ -671,14 +945,15 @@ export function DashboardWorkspace() {
                     }}
                   />
                   <Button
-                    variant="ghost"
+                    variant="destructive-outline"
+                    size="icon-sm"
                     onClick={() =>
                       setRules(
                         rules.filter((_, itemIndex) => itemIndex !== index),
                       )
                     }
                   >
-                    删除
+                    <Trash2Icon aria-hidden="true" />
                   </Button>
                 </div>
               ))}
