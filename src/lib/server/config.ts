@@ -36,12 +36,14 @@ export const buildCurrentConfig = async ({
   proxyGroups,
   rules,
   settings,
+  generatedConfig,
 }: {
   urls?: string;
   parsedNodes?: unknown;
   proxyGroups?: unknown;
   rules?: unknown;
   settings?: unknown;
+  generatedConfig?: unknown;
 }) => {
   const proxies = Array.isArray(parsedNodes) && parsedNodes.length > 0
     ? parsedNodes
@@ -51,12 +53,14 @@ export const buildCurrentConfig = async ({
   const configSettings = settings && typeof settings === "object" && !Array.isArray(settings)
     ? settings as Record<string, unknown>
     : {};
-  const yamlStr = generateConfig({
-    proxies,
-    proxyGroups: groups as any,
-    rules: ruleItems as any,
-    settings: configSettings,
-  });
+  const yamlStr = typeof generatedConfig === "string" && generatedConfig.trim()
+    ? generatedConfig
+    : generateConfig({
+      proxies,
+      proxyGroups: groups as any,
+      rules: ruleItems as any,
+      settings: configSettings,
+    });
 
   return {
     yamlStr,

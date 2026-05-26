@@ -1,7 +1,7 @@
 import axios from 'axios';
 import dns from 'dns/promises';
 import net from 'net';
-import type { ParseErrorCode, ParseErrorKind } from './types';
+import type { MihomoProxy, ParseErrorCode, ParseErrorKind } from './types';
 
 const MAX_SUBSCRIPTION_BYTES = Number(process.env.MAX_SUBSCRIPTION_BYTES || 5 * 1024 * 1024);
 const SUBSCRIPTION_TIMEOUT_MS = Number(process.env.SUBSCRIPTION_TIMEOUT_MS || 15000);
@@ -88,7 +88,7 @@ const assertSafeSubscriptionUrl = async (rawUrl: string) => {
 /**
  * Fetch a subscription URL and parse its contents into a list of Mihomo proxies.
  */
-export const fetchAndParseSubscription = async (url: string, parseRawContent: (rawData: string) => any[]): Promise<any[]> => {
+export const fetchAndParseSubscription = async (url: string, parseRawContent: (rawData: string) => MihomoProxy[]): Promise<MihomoProxy[]> => {
   await assertSafeSubscriptionUrl(url);
 
   const response = await axios.get(url, {

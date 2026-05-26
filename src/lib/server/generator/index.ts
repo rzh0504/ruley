@@ -1,5 +1,6 @@
 import yaml from 'yaml';
 import { getDefaultPolicyOptions, RULE_PROVIDERS, type ProxyGroupPolicyOption, type ProxyGroupType } from '@/lib/config/proxy-templates';
+import type { MihomoProxy } from '@/lib/server/parser';
 
 // ============================================================================
 // Types
@@ -25,7 +26,7 @@ export interface RuleItem {
 }
 
 export interface GenerateRequest {
-  proxies: any[];
+  proxies: MihomoProxy[];
   proxyGroups: GroupConfig[];
   rules: RuleItem[];
   settings?: {
@@ -40,11 +41,85 @@ export interface GenerateRequest {
   };
 }
 
+type RuleProviderBehavior = 'domain' | 'ipcidr' | 'classical';
+
+type MihomoRuleProvider = {
+  type: 'http';
+  behavior: RuleProviderBehavior;
+  url: string;
+  path: string;
+  interval: number;
+  format: 'mrs' | 'yaml';
+  yamlUrl?: string;
+  yamlPath?: string;
+};
+
+type MihomoProxyGroup = {
+  name: string;
+  type: ProxyGroupType;
+  proxies: string[];
+  url?: string;
+  interval?: number;
+  lazy?: boolean;
+  'dialer-proxy'?: string;
+};
+
+type DnsConfig = {
+  enable: boolean;
+  listen: string;
+  ipv6: boolean;
+  'enhanced-mode': string;
+  'fake-ip-range': string;
+  nameserver: string[];
+  fallback?: string[];
+  'fallback-filter'?: {
+    geoip: boolean;
+    'geoip-code': string;
+    ipcidr: string[];
+    domain: string[];
+  };
+  'use-system-hosts': boolean;
+};
+
+type MihomoConfig = {
+  mode: string;
+  'mixed-port': number;
+  'socks-port'?: number;
+  'allow-lan': boolean;
+  'log-level': string;
+  ipv6: boolean;
+  'external-controller': string;
+  secret: string;
+  'unified-delay': boolean;
+  dns: DnsConfig;
+  'external-controller-pipe': string;
+  'external-controller-cors': {
+    'allow-private-network': boolean;
+    'allow-origins': string[];
+  };
+  tun: {
+    'auto-detect-interface': boolean;
+    'auto-route': boolean;
+    device: string;
+    'dns-hijack': string[];
+    mtu: number;
+    'route-exclude-address': string[];
+    stack: string;
+    'strict-route': boolean;
+    enable: boolean;
+  };
+  profile: { 'store-selected': boolean; 'store-fake-ip': boolean };
+  proxies: MihomoProxy[];
+  'proxy-groups': MihomoProxyGroup[];
+  'rule-providers'?: Record<string, MihomoRuleProvider>;
+  rules?: string[];
+};
+
 // ============================================================================
 // Generator
 // ============================================================================
 
-const matchProxies = (proxies: any[], filter: string): string[] => {
+const matchProxies = (proxies: MihomoProxy[], filter: string): string[] => {
   if (!filter || !proxies.length) return [];
   if (filter.length > 120 || /\([^)]*[+*][^)]*\)[+*?{]/.test(filter)) {
     const lower = filter.toLowerCase();
@@ -70,7 +145,7 @@ export const generateConfig = (req: GenerateRequest): string => {
   const proxies = rawProxies;
 
   // --- Build proxy-groups ---
-  const mihomoProxyGroups: any[] = [];
+  const mihomoProxyGroups: MihomoProxyGroup[] = [];
 
   const mainGroupName = proxyGroups.length > 0
     ? `${proxyGroups[0].icon} ${proxyGroups[0].name}` : '🚀 节点选择';
@@ -102,7 +177,7 @@ export const generateConfig = (req: GenerateRequest): string => {
 
     if (groupProxies.length === 0) groupProxies.push('DIRECT');
 
-    const mihomoGroup: any = {
+    const mihomoGroup: MihomoProxyGroup = {
       name: fullName,
       type: actualType,
       proxies: [...new Set(groupProxies)],
@@ -126,7 +201,7 @@ export const generateConfig = (req: GenerateRequest): string => {
   }
 
   // --- Collect rule-providers and RULE-SET rules from group templates ---
-  const usedProviders: Record<string, any> = {};
+  const usedProviders: Record<string, MihomoRuleProvider> = {};
   const ruleSetRules: string[] = [];
 
   for (const group of proxyGroups) {
@@ -143,7 +218,7 @@ export const generateConfig = (req: GenerateRequest): string => {
           noResolve = true;
         }
 
-        let behavior = 'domain';
+        let behavior: RuleProviderBehavior = 'domain';
         if (actualUrl.includes('geoip') || actualUrl.includes('ipcidr')) behavior = 'ipcidr';
         else if (actualUrl.includes('classical')) behavior = 'classical';
         else if (actualUrl.includes('geosite')) behavior = 'domain';
@@ -191,7 +266,7 @@ export const generateConfig = (req: GenerateRequest): string => {
     allRules.push(`MATCH,${catchAll ? `${catchAll.icon} ${catchAll.name}` : mainGroupName}`);
   }
 
-  const dnsConfig = advancedDns ? {
+  const dnsConfig: DnsConfig = advancedDns ? {
     enable: true,
     listen: '0.0.0.0:53',
     ipv6: true,
@@ -217,7 +292,7 @@ export const generateConfig = (req: GenerateRequest): string => {
   };
 
   // --- Full config ---
-  const config: any = {
+  const config: MihomoConfig = {
     mode,
     'mixed-port': port,
     ...(socksPort ? { 'socks-port': socksPort } : {}),

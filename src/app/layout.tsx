@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import type React from "react";
 import { Inter, Geist_Mono } from "next/font/google";
-import Script from "next/script";
 import "./globals.css";
 import { Providers } from "./providers";
 
@@ -17,9 +16,6 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
-      <Script id="theme-init" strategy="beforeInteractive">
-        {`try{var t=localStorage.getItem('ruley-theme')||'system';var d=t==='system'?window.matchMedia('(prefers-color-scheme: dark)').matches:t==='dark';document.documentElement.classList.toggle('dark',d);}catch(e){}`}
-      </Script>
       <body className={`${inter.variable} ${interHeading.variable} ${geistMono.variable} isolate min-h-screen bg-background font-sans text-foreground antialiased`}>
         <Providers>{children}</Providers>
       </body>

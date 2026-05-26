@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
 import hljs from "highlight.js/lib/core";
 import yamlLanguage from "highlight.js/lib/languages/yaml";
@@ -155,6 +155,9 @@ const defaultAdvancedSettings: AdvancedSettings = {
   advancedDns: true,
 };
 
+const initialVisibleRuleCount = 50;
+const visibleRuleStep = 50;
+
 const normalizeAdvancedSettings = (
   settings?: Partial<AdvancedSettings> | null,
 ): AdvancedSettings => ({
@@ -169,6 +172,18 @@ const serializeAdvancedSettings = (settings: AdvancedSettings) => ({
   ...settings,
   socksPort: settings.socksPort > 0 ? settings.socksPort : undefined,
 });
+
+const getWorkspaceSignature = ({
+  nodes,
+  groups,
+  rules,
+  settings,
+}: {
+  nodes: Record<string, unknown>[];
+  groups: ProxyGroupTemplate[];
+  rules: RuleItem[];
+  settings: AdvancedSettings;
+}) => JSON.stringify({ nodes, groups, rules, settings: serializeAdvancedSettings(settings) });
 
 const getDisplayCloudUrl = (cloudUrl?: string | null) => {
   if (!cloudUrl) return "";
@@ -533,8 +548,19 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
   const [rules, setRules] = useState<RuleItem[]>(initialState.rules);
   const [advancedSettings, setAdvancedSettings] = useState<AdvancedSettings>(initialState.advancedSettings);
   const [generatedConfig, setGeneratedConfig] = useState(initialState.generatedConfig);
+  const [generatedConfigSignature, setGeneratedConfigSignature] = useState(
+    initialState.generatedConfig
+      ? getWorkspaceSignature({
+          nodes: initialState.nodes,
+          groups: initialState.groups,
+          rules: initialState.rules,
+          settings: initialState.advancedSettings,
+        })
+      : "",
+  );
   const [cloudUrl, setCloudUrl] = useState(initialState.cloudUrl);
   const [currentConfigId, setCurrentConfigId] = useState<number | null>(initialState.currentConfigId);
+  const [visibleRuleCount, setVisibleRuleCount] = useState(initialVisibleRuleCount);
   const [parseErrors, setParseErrors] = useState<ParseErrorRecord[]>([]);
   const [parseDiagnostics, setParseDiagnostics] = useState<ParseDiagnostic[]>(
     [],
@@ -562,6 +588,12 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
     [groups],
   );
 
+  const workspaceSignature = useMemo(
+    () => getWorkspaceSignature({ nodes, groups, rules, settings: advancedSettings }),
+    [nodes, groups, rules, advancedSettings],
+  );
+  const isGeneratedConfigCurrent = Boolean(generatedConfig && generatedConfigSignature === workspaceSignature);
+
   const syncSources = (nextSources: SubscriptionSource[]) => {
     setSources(nextSources);
     setUrls(serializeSubscriptionSources(nextSources));
@@ -578,7 +610,18 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
     setRules(nextState.rules);
     setNodes(nextState.nodes);
     setGeneratedConfig(nextState.generatedConfig);
+    setGeneratedConfigSignature(
+      nextState.generatedConfig
+        ? getWorkspaceSignature({
+            nodes: nextState.nodes,
+            groups: nextState.groups,
+            rules: nextState.rules,
+            settings: nextState.advancedSettings,
+          })
+        : "",
+    );
     setCloudUrl(nextState.cloudUrl);
+    setVisibleRuleCount(initialVisibleRuleCount);
     setParseErrors([]);
     setParseDiagnostics([]);
     setValidationIssues([]);
@@ -688,9 +731,14 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
     setSourcePreviewCache((cache) => ({ ...cache, [cacheKey]: nextPreview }));
   };
 
+  const deferredGeneratedConfig = useDeferredValue(generatedConfig);
   const yamlBlocks = useMemo(
-    () => getYamlBlocks(generatedConfig),
-    [generatedConfig],
+    () => getYamlBlocks(deferredGeneratedConfig),
+    [deferredGeneratedConfig],
+  );
+  const displayedRules = useMemo(
+    () => rules.slice(0, visibleRuleCount),
+    [rules, visibleRuleCount],
   );
 
   const toggleYamlSection = (key: string) => {
@@ -814,6 +862,7 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
         return;
       }
       setGeneratedConfig(data.config);
+      setGeneratedConfigSignature(workspaceSignature);
       toastManager.add({ type: "success", title: "YAML 已生成" });
     });
 
@@ -848,7 +897,7 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
           rules,
           settings: serializeAdvancedSettings(advancedSettings),
           parsedNodes: nodes,
-          generatedConfig,
+          generatedConfig: isGeneratedConfigCurrent ? generatedConfig : undefined,
         }),
       });
       const data = await response.json();
@@ -1302,18 +1351,17 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
                               </span>
                               <Badge variant="outline">{block.count}</Badge>
                             </button>
-                            <div
-                              className="yaml-collapse"
-                              data-collapsed={collapsed ? "true" : "false"}
-                            >
-                              <div className="min-h-0 overflow-hidden">
-                                <HighlightedYaml
-                                  content={block.content}
-                                  startLine={block.startLine}
-                                  compact={block.foldable}
-                                />
+                            {!collapsed && (
+                              <div className="yaml-collapse">
+                                <div className="min-h-0 overflow-hidden">
+                                  <HighlightedYaml
+                                    content={block.content}
+                                    startLine={block.startLine}
+                                    compact={block.foldable}
+                                  />
+                                </div>
                               </div>
-                            </div>
+                            )}
                           </section>
                         );
                       })}
@@ -1377,7 +1425,7 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
               </Dialog>
             </CardHeader>
             <CardContent className="min-h-0 flex-1 overflow-auto flex flex-col gap-3">
-              {rules.map((rule, index) => (
+              {displayedRules.map((rule, index) => (
                 <div
                   key={rule.id}
                   className="grid items-start gap-2 rounded-xl border p-3 lg:grid-cols-[auto_1fr_1.4fr_1.4fr_auto]"
@@ -1448,6 +1496,14 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
                   </Button>
                 </div>
               ))}
+              {visibleRuleCount < rules.length && (
+                <Button
+                  variant="outline"
+                  onClick={() => setVisibleRuleCount((count) => Math.min(count + visibleRuleStep, rules.length))}
+                >
+                  加载更多规则（{visibleRuleCount}/{rules.length}）
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={() =>

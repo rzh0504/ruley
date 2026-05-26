@@ -1,11 +1,13 @@
+import type { MihomoProxy } from '../types';
+
 /**
  * Parse a hysteria2:// or hy2:// link into a Mihomo proxy object.
  */
-export const parseHysteria2 = (link: string): any => {
+export const parseHysteria2 = (link: string): MihomoProxy | null => {
   try {
     const parseableLink = link.replace(/^(hysteria2|hy2):\/\//, 'http://');
     const url = new URL(parseableLink);
-    const proxy: any = {
+    const proxy: MihomoProxy = {
       name: decodeURIComponent(url.hash.replace('#', '')) || 'Unnamed Hysteria2',
       type: 'hysteria2',
       server: url.hostname,
@@ -36,11 +38,11 @@ export const parseHysteria2 = (link: string): any => {
 /**
  * Parse a hysteria:// (v1) link into a Mihomo proxy object.
  */
-export const parseHysteria = (link: string): any => {
+export const parseHysteria = (link: string): MihomoProxy | null => {
   try {
     const parseableLink = link.replace('hysteria://', 'http://');
     const url = new URL(parseableLink);
-    const proxy: any = {
+    const proxy: MihomoProxy = {
       name: decodeURIComponent(url.hash.replace('#', '')) || 'Unnamed Hysteria',
       type: 'hysteria',
       server: url.hostname,
@@ -73,11 +75,11 @@ export const parseHysteria = (link: string): any => {
 /**
  * Parse a tuic:// link into a Mihomo proxy object.
  */
-export const parseTuic = (link: string): any => {
+export const parseTuic = (link: string): MihomoProxy | null => {
   try {
     const parseableLink = link.replace('tuic://', 'http://');
     const url = new URL(parseableLink);
-    const proxy: any = {
+    const proxy: MihomoProxy = {
       name: decodeURIComponent(url.hash.replace('#', '')) || 'Unnamed TUIC',
       type: 'tuic',
       server: url.hostname,
@@ -112,11 +114,11 @@ export const parseTuic = (link: string): any => {
 /**
  * Parse a wireguard:// or wg:// link into a Mihomo proxy object.
  */
-export const parseWireGuard = (link: string): any => {
+export const parseWireGuard = (link: string): MihomoProxy | null => {
   try {
     const parseableLink = link.replace(/^(wireguard|wg):\/\//, 'http://');
     const url = new URL(parseableLink);
-    const proxy: any = {
+    const proxy: MihomoProxy = {
       name: decodeURIComponent(url.hash.replace('#', '')) || 'Unnamed WireGuard',
       type: 'wireguard',
       server: url.hostname,
@@ -153,11 +155,11 @@ export const parseWireGuard = (link: string): any => {
 /**
  * Parse a snell:// link into a Mihomo proxy object.
  */
-export const parseSnell = (link: string): any => {
+export const parseSnell = (link: string): MihomoProxy | null => {
   try {
     const parseableLink = link.replace('snell://', 'http://');
     const url = new URL(parseableLink);
-    const proxy: any = {
+    const proxy: MihomoProxy = {
       name: decodeURIComponent(url.hash.replace('#', '')) || 'Unnamed Snell',
       type: 'snell',
       server: url.hostname,

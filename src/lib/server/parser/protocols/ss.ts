@@ -1,9 +1,10 @@
 import { decodeBase64, decodeUrlSafeBase64 } from '../base64';
+import type { MihomoProxy } from '../types';
 
 /**
  * Parse a ss:// link (SIP002 and legacy) into a Mihomo proxy object.
  */
-export const parseShadowsocks = (link: string): any => {
+export const parseShadowsocks = (link: string): MihomoProxy | null => {
   try {
     const raw = link.replace('ss://', '');
     let namePart = '';
@@ -39,7 +40,7 @@ export const parseShadowsocks = (link: string): any => {
 
     const url = new URL(`http://${userInfoAndHost}`);
 
-    const proxy: any = {
+    const proxy: MihomoProxy = {
       name: namePart || 'Unnamed ss',
       type: 'ss',
       server: url.hostname,
@@ -87,7 +88,7 @@ export const parseShadowsocks = (link: string): any => {
 /**
  * Parse a ssr:// link into a Mihomo proxy object.
  */
-export const parseShadowsocksR = (link: string): any => {
+export const parseShadowsocksR = (link: string): MihomoProxy | null => {
   try {
     const encoded = link.replace('ssr://', '');
     const decoded = decodeUrlSafeBase64(encoded);
@@ -117,7 +118,7 @@ export const parseShadowsocksR = (link: string): any => {
     const remarks = params.get('remarks') ? decodeUrlSafeBase64(params.get('remarks')!) : '';
     const group = params.get('group') ? decodeUrlSafeBase64(params.get('group')!) : '';
 
-    const proxy: any = {
+    const proxy: MihomoProxy = {
       name: remarks || `${host}:${port}`,
       type: 'ssr',
       server: host,

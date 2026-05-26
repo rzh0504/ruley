@@ -1,10 +1,12 @@
+import type { MihomoProxy } from '../types';
+
 /**
  * Parse a trojan:// link into a Mihomo proxy object.
  */
-export const parseTrojan = (link: string): any => {
+export const parseTrojan = (link: string): MihomoProxy | null => {
   try {
     const url = new URL(link);
-    const proxy: any = {
+    const proxy: MihomoProxy = {
       name: decodeURIComponent(url.hash.replace('#', '')) || 'Unnamed trojan',
       type: 'trojan',
       server: url.hostname,

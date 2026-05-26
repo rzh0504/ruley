@@ -6,6 +6,26 @@ export type ParseDiagnostic = {
   to?: string;
 };
 
+export type ProxyScalar = string | number | boolean | null;
+export type ProxyValue = ProxyScalar | ProxyValue[] | { [key: string]: ProxyValue };
+
+export type MihomoProxy = {
+  name: string;
+  type: string;
+  server?: string;
+  port?: number;
+  uuid?: string;
+  password?: string;
+  'private-key'?: string;
+  'ws-opts'?: {
+    path?: string;
+    headers?: {
+      Host?: string | string[];
+    };
+  };
+  [key: string]: ProxyValue | undefined;
+};
+
 export type ParseErrorCode =
   | 'subscription_url_limit_exceeded'
   | 'subscription_url_invalid'
@@ -39,7 +59,7 @@ export const createParseError = (error: Omit<ParseError, 'error'>): ParseError =
 });
 
 export type ParseInputResult = {
-  proxies: any[];
+  proxies: MihomoProxy[];
   errors: ParseError[];
   diagnostics: ParseDiagnostic[];
 };

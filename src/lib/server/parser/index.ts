@@ -5,7 +5,7 @@ import { parseShadowsocks, parseShadowsocksR } from './protocols/ss';
 import { parseTrojan } from './protocols/trojan';
 import { parseVless } from './protocols/vless';
 import { parseVmess } from './protocols/vmess';
-import { createParseError, type ParseDiagnostic, type ParseError, type ParseInputResult } from './types';
+import { createParseError, type MihomoProxy, type ParseDiagnostic, type ParseError, type ParseInputResult } from './types';
 import { tryParseYaml } from './yaml';
 
 export { decodeBase64, decodeUrlSafeBase64, isLikelyBase64 } from './base64';
@@ -15,7 +15,7 @@ export { parseShadowsocks, parseShadowsocksR } from './protocols/ss';
 export { parseTrojan } from './protocols/trojan';
 export { parseVless } from './protocols/vless';
 export { parseVmess } from './protocols/vmess';
-export type { ParseDiagnostic, ParseError, ParseErrorCode, ParseErrorKind, ParseErrorSeverity, ParseInputResult } from './types';
+export type { MihomoProxy, ParseDiagnostic, ParseError, ParseErrorCode, ParseErrorKind, ParseErrorSeverity, ParseInputResult } from './types';
 export { tryParseYaml } from './yaml';
 
 const PROXY_PREFIXES = [
@@ -57,7 +57,7 @@ const runWithConcurrency = async <T, R>(items: T[], limit: number, worker: (item
 /**
  * Dispatcher to parse a single text line into a proxy object.
  */
-export const parseLineToProxy = (line: string): any | null => {
+export const parseLineToProxy = (line: string): MihomoProxy | null => {
   line = line.trim();
   if (!line) return null;
 
@@ -78,7 +78,7 @@ export const parseLineToProxy = (line: string): any | null => {
 /**
  * Parse raw text content that could be YAML, Base64 subscription data, or proxy URIs.
  */
-export const parseRawContent = (rawData: string): any[] => {
+export const parseRawContent = (rawData: string): MihomoProxy[] => {
   const trimmed = rawData.trim();
   if (!trimmed) return [];
 
@@ -108,9 +108,9 @@ export const parseRawContent = (rawData: string): any[] => {
 /**
  * Parse multi-line text as individual proxy URIs.
  */
-const parseLinesAsProxies = (text: string): any[] => {
+const parseLinesAsProxies = (text: string): MihomoProxy[] => {
   const lines = text.split(/\r?\n/);
-  const proxies: any[] = [];
+  const proxies: MihomoProxy[] = [];
   for (const line of lines) {
     const proxy = parseLineToProxy(line);
     if (proxy) proxies.push(proxy);
@@ -118,15 +118,15 @@ const parseLinesAsProxies = (text: string): any[] => {
   return proxies;
 };
 
-const getProxyIdentity = (proxy: any) => {
+const getProxyIdentity = (proxy: MihomoProxy) => {
   const credential = proxy.uuid || proxy.password || proxy['private-key'] || proxy.name || '';
   return [proxy.type, proxy.server, proxy.port, credential].map(value => String(value || '')).join('|');
 };
 
-const normalizeProxyNames = (proxies: any[], diagnostics: ParseDiagnostic[]) => {
+const normalizeProxyNames = (proxies: MihomoProxy[], diagnostics: ParseDiagnostic[]) => {
   const seenIdentity = new Set<string>();
   const nameCounts = new Map<string, number>();
-  const normalized: any[] = [];
+  const normalized: MihomoProxy[] = [];
 
   for (const proxy of proxies) {
     const identity = getProxyIdentity(proxy);
@@ -162,7 +162,7 @@ const normalizeProxyNames = (proxies: any[], diagnostics: ParseDiagnostic[]) => 
 };
 
 export const parseInput = async (rawInput: string): Promise<ParseInputResult> => {
-  const allProxies: any[] = [];
+  const allProxies: MihomoProxy[] = [];
   const errors: ParseError[] = [];
   const diagnostics: ParseDiagnostic[] = [];
 

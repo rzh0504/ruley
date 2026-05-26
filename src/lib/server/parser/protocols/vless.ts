@@ -1,10 +1,12 @@
+import type { MihomoProxy } from '../types';
+
 /**
  * Parse a vless:// link into a Mihomo proxy object.
  */
-export const parseVless = (link: string): any => {
+export const parseVless = (link: string): MihomoProxy | null => {
   try {
     const url = new URL(link);
-    const proxy: any = {
+    const proxy: MihomoProxy = {
       name: decodeURIComponent(url.hash.replace('#', '')) || 'Unnamed vless',
       type: 'vless',
       server: url.hostname,
@@ -42,7 +44,7 @@ export const parseVless = (link: string): any => {
       proxy['ws-opts'] = {
         path: url.searchParams.get('path') || '/',
         headers: {
-          Host: url.searchParams.get('host') || proxy.servername || url.hostname,
+          Host: url.searchParams.get('host') || url.searchParams.get('sni') || url.hostname,
         },
       };
     } else if (type === 'grpc') {
