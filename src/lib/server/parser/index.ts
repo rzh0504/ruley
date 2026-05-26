@@ -812,17 +812,69 @@ const parseLinesAsProxies = (text: string): any[] => {
  *
  * Returns { proxies, errors }.
  */
-export const parseInput = async (rawInput: string): Promise<{ proxies: any[], errors: any[] }> => {
+export type ParseDiagnostic = {
+  type: 'duplicate' | 'renamed' | 'skipped';
+  message: string;
+  name?: string;
+  from?: string;
+  to?: string;
+};
+
+const getProxyIdentity = (proxy: any) => {
+  const credential = proxy.uuid || proxy.password || proxy['private-key'] || proxy.name || '';
+  return [proxy.type, proxy.server, proxy.port, credential].map(value => String(value || '')).join('|');
+};
+
+const normalizeProxyNames = (proxies: any[], diagnostics: ParseDiagnostic[]) => {
+  const seenIdentity = new Set<string>();
+  const nameCounts = new Map<string, number>();
+  const normalized: any[] = [];
+
+  for (const proxy of proxies) {
+    const identity = getProxyIdentity(proxy);
+    if (seenIdentity.has(identity)) {
+      diagnostics.push({
+        type: 'duplicate',
+        name: String(proxy.name || 'Unnamed'),
+        message: `已移除重复节点：${String(proxy.name || 'Unnamed')}`,
+      });
+      continue;
+    }
+    seenIdentity.add(identity);
+
+    const baseName = String(proxy.name || 'Unnamed').trim() || 'Unnamed';
+    const count = nameCounts.get(baseName) || 0;
+    nameCounts.set(baseName, count + 1);
+    if (count === 0) {
+      normalized.push({ ...proxy, name: baseName });
+      continue;
+    }
+
+    const nextName = `${baseName} #${count + 1}`;
+    diagnostics.push({
+      type: 'renamed',
+      from: baseName,
+      to: nextName,
+      message: `同名节点已重命名：${baseName} -> ${nextName}`,
+    });
+    normalized.push({ ...proxy, name: nextName });
+  }
+
+  return normalized;
+};
+
+export const parseInput = async (rawInput: string): Promise<{ proxies: any[], errors: any[], diagnostics: ParseDiagnostic[] }> => {
   const allProxies: any[] = [];
   const errors: any[] = [];
+  const diagnostics: ParseDiagnostic[] = [];
 
   const trimmed = rawInput.trim();
-  if (!trimmed) return { proxies: allProxies, errors };
+  if (!trimmed) return { proxies: allProxies, errors, diagnostics };
 
   // --- Strategy 1: Try the whole input as YAML ---
   const yamlProxies = tryParseYaml(trimmed);
   if (yamlProxies && yamlProxies.length > 0) {
-    return { proxies: yamlProxies, errors };
+    return { proxies: normalizeProxyNames(yamlProxies, diagnostics), errors, diagnostics };
   }
 
   // --- Strategy 2: Try the whole input as Base64 ---
@@ -832,11 +884,11 @@ export const parseInput = async (rawInput: string): Promise<{ proxies: any[], er
     if (decoded) {
       const yamlFromB64 = tryParseYaml(decoded);
       if (yamlFromB64 && yamlFromB64.length > 0) {
-        return { proxies: yamlFromB64, errors };
+        return { proxies: normalizeProxyNames(yamlFromB64, diagnostics), errors, diagnostics };
       }
       const proxiesFromB64 = parseLinesAsProxies(decoded);
       if (proxiesFromB64.length > 0) {
-        return { proxies: proxiesFromB64, errors };
+        return { proxies: normalizeProxyNames(proxiesFromB64, diagnostics), errors, diagnostics };
       }
     }
   }
@@ -897,18 +949,13 @@ export const parseInput = async (rawInput: string): Promise<{ proxies: any[], er
   // Log unknown lines
   for (const line of unknownLines) {
     if (line.length > 5) {
+      diagnostics.push({
+        type: 'skipped',
+        message: `已跳过无法识别的输入：${line.substring(0, 80)}`,
+      });
       console.warn(`[Parser] Skipped unknown input: ${line.substring(0, 40)}...`);
     }
   }
 
-  // Deduplicate proxies by server+port+type
-  const seen = new Set<string>();
-  const dedupedProxies = allProxies.filter(p => {
-    const key = `${p.server}:${p.port}:${p.type}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-
-  return { proxies: dedupedProxies, errors };
+  return { proxies: normalizeProxyNames(allProxies, diagnostics), errors, diagnostics };
 };

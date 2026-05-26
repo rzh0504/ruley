@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
 import {
+  AlertTriangleIcon,
   CopyIcon,
   DownloadIcon,
   GitForkIcon,
@@ -35,6 +36,15 @@ import {
 } from "@/lib/config/proxy-templates";
 
 type RuleItem = { id: string; type: string; value: string; policy: string };
+type ParseErrorRecord = { url?: string; input?: string; error?: string };
+type ParseDiagnostic = {
+  type: "duplicate" | "renamed" | "skipped";
+  message: string;
+};
+type ValidationIssue = {
+  severity: "error" | "warning";
+  message: string;
+};
 type ConfigRecord = {
   id: number;
   name: string;
@@ -62,6 +72,97 @@ const ruleTypes = [
   "MATCH",
 ];
 
+const isComplexRegex = (value: string) =>
+  value.length > 120 || /\([^)]*[+*][^)]*\)[+*?{]/.test(value);
+
+const matchNodesByFilter = (
+  nodes: Record<string, unknown>[],
+  filter: string,
+) => {
+  if (!filter || nodes.length === 0) return [];
+  if (isComplexRegex(filter)) {
+    const lower = filter.toLowerCase();
+    return nodes.filter((node) =>
+      String(node.name || "").toLowerCase().includes(lower),
+    );
+  }
+  try {
+    const regex = new RegExp(filter, "i");
+    return nodes.filter((node) => regex.test(String(node.name || "")));
+  } catch {
+    return null;
+  }
+};
+
+const validateWorkspace = ({
+  nodes,
+  groups,
+  rules,
+}: {
+  nodes: Record<string, unknown>[];
+  groups: ProxyGroupTemplate[];
+  rules: RuleItem[];
+}): ValidationIssue[] => {
+  const issues: ValidationIssue[] = [];
+  const policies = new Set([
+    ...groups.map((group) => `${group.icon} ${group.name}`),
+    "DIRECT",
+    "REJECT",
+  ]);
+
+  if (nodes.length === 0) {
+    issues.push({ severity: "error", message: "请先解析出至少 1 个节点" });
+  }
+  if (groups.length === 0) {
+    issues.push({ severity: "error", message: "至少需要保留 1 个代理组" });
+  }
+
+  for (const group of groups) {
+    const groupName = `${group.icon} ${group.name}`;
+    if (!group.name.trim()) {
+      issues.push({ severity: "error", message: "代理组名称不能为空" });
+    }
+    const matched = matchNodesByFilter(nodes, group.filter || "");
+    if (matched === null) {
+      issues.push({
+        severity: "error",
+        message: `${groupName} 的节点筛选正则无效`,
+      });
+    } else if (
+      nodes.length > 0 &&
+      (group.policyOptions || []).includes("matched") &&
+      matched.length === 0
+    ) {
+      issues.push({
+        severity: "warning",
+        message: `${groupName} 未匹配到任何真实节点，将回退到其他策略`,
+      });
+    }
+  }
+
+  for (const rule of rules) {
+    if (rule.type !== "MATCH" && !rule.value.trim()) {
+      issues.push({
+        severity: "error",
+        message: `${rule.type} 规则的匹配值不能为空`,
+      });
+    }
+    if (!policies.has(rule.policy)) {
+      issues.push({
+        severity: "error",
+        message: `规则引用了不存在的策略：${rule.policy}`,
+      });
+    }
+  }
+
+  return issues;
+};
+
+const formatParseError = (error: ParseErrorRecord) => {
+  const source = error.url || error.input;
+  return source ? `${source}: ${error.error || "解析失败"}` : error.error || "解析失败";
+};
+
 export function DashboardWorkspace() {
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -74,6 +175,9 @@ export function DashboardWorkspace() {
   const [generatedConfig, setGeneratedConfig] = useState("");
   const [cloudUrl, setCloudUrl] = useState("");
   const [currentConfigId, setCurrentConfigId] = useState<number | null>(null);
+  const [parseErrors, setParseErrors] = useState<ParseErrorRecord[]>([]);
+  const [parseDiagnostics, setParseDiagnostics] = useState<ParseDiagnostic[]>([]);
+  const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
 
   const policies = useMemo(
     () => [
@@ -103,6 +207,9 @@ export function DashboardWorkspace() {
       setNodes(config.parsedNodes || []);
       setGeneratedConfig("");
       setCloudUrl("");
+      setParseErrors([]);
+      setParseDiagnostics([]);
+      setValidationIssues([]);
       toastManager.add({
         type: "success",
         title: "配置已加载",
@@ -120,6 +227,8 @@ export function DashboardWorkspace() {
       });
       const data = await response.json();
       if (!data.success) {
+        setParseErrors([{ error: data.error || "解析失败" }]);
+        setParseDiagnostics([]);
         toastManager.add({
           type: "error",
           title: "解析失败",
@@ -128,6 +237,9 @@ export function DashboardWorkspace() {
         return;
       }
       setNodes(data.proxies || []);
+      setParseErrors(data.errors || []);
+      setParseDiagnostics(data.diagnostics || []);
+      setValidationIssues([]);
       toastManager.add({
         type: "success",
         title: "解析完成",
@@ -137,8 +249,15 @@ export function DashboardWorkspace() {
 
   const generate = () =>
     startTransition(async () => {
-      if (nodes.length === 0) {
-        toastManager.add({ type: "warning", title: "请先解析节点" });
+      const issues = validateWorkspace({ nodes, groups, rules });
+      setValidationIssues(issues);
+      const blockingIssues = issues.filter((issue) => issue.severity === "error");
+      if (blockingIssues.length > 0) {
+        toastManager.add({
+          type: "warning",
+          title: "生成前校验未通过",
+          description: blockingIssues[0]?.message,
+        });
         return;
       }
       const response = await fetch("/api/generate", {
@@ -168,6 +287,17 @@ export function DashboardWorkspace() {
     startTransition(async () => {
       if (!urls.trim()) {
         toastManager.add({ type: "warning", title: "请先填写订阅来源" });
+        return;
+      }
+      const issues = validateWorkspace({ nodes, groups, rules });
+      setValidationIssues(issues);
+      const blockingIssues = issues.filter((issue) => issue.severity === "error");
+      if (blockingIssues.length > 0) {
+        toastManager.add({
+          type: "warning",
+          title: "保存前校验未通过",
+          description: blockingIssues[0]?.message,
+        });
         return;
       }
       const response = await fetch("/api/cloud-save", {
@@ -300,6 +430,58 @@ export function DashboardWorkspace() {
                 <RefreshCwIcon aria-hidden="true" />
                 解析节点
               </Button>
+              {(parseErrors.length > 0 ||
+                parseDiagnostics.length > 0 ||
+                validationIssues.length > 0) && (
+                <div className="flex flex-col gap-3 rounded-xl border bg-muted/30 p-3">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <AlertTriangleIcon className="size-4" aria-hidden="true" />
+                    诊断与校验
+                  </div>
+                  {validationIssues.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                      <div className="text-muted-foreground text-xs">生成前校验</div>
+                      {validationIssues.map((issue, index) => (
+                        <div
+                          key={`validation-${index}`}
+                          className="flex items-start gap-2 rounded-lg border bg-background p-2 text-sm"
+                        >
+                          <Badge variant={issue.severity === "error" ? "error" : "warning"}>
+                            {issue.severity === "error" ? "错误" : "警告"}
+                          </Badge>
+                          <span>{issue.message}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {parseErrors.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                      <div className="text-muted-foreground text-xs">解析错误</div>
+                      {parseErrors.map((error, index) => (
+                        <div
+                          key={`parse-error-${index}`}
+                          className="rounded-lg border border-error/30 bg-error/8 p-2 text-sm"
+                        >
+                          {formatParseError(error)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {parseDiagnostics.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                      <div className="text-muted-foreground text-xs">解析处理</div>
+                      {parseDiagnostics.map((diagnostic, index) => (
+                        <div
+                          key={`parse-diagnostic-${index}`}
+                          className="rounded-lg border bg-background p-2 text-sm text-muted-foreground"
+                        >
+                          {diagnostic.message}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 

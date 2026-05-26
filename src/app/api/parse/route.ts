@@ -19,6 +19,7 @@ export async function POST(request: Request) {
       nodesCount: result.proxies.length,
       proxies: result.proxies,
       errors: result.errors.length > 0 ? result.errors : undefined,
+      diagnostics: result.diagnostics.length > 0 ? result.diagnostics : undefined,
     });
   } catch (error) {
     console.error("[PARSE] Error:", error);
