@@ -1,11 +1,11 @@
 import { decodeBase64, isLikelyBase64 } from './base64';
-import { fetchAndParseSubscription } from './fetch';
+import { fetchAndParseSubscription, SubscriptionParseError } from './fetch';
 import { parseHysteria, parseHysteria2, parseSnell, parseTuic, parseWireGuard } from './protocols/misc';
 import { parseShadowsocks, parseShadowsocksR } from './protocols/ss';
 import { parseTrojan } from './protocols/trojan';
 import { parseVless } from './protocols/vless';
 import { parseVmess } from './protocols/vmess';
-import type { ParseDiagnostic, ParseInputResult } from './types';
+import { createParseError, type ParseDiagnostic, type ParseError, type ParseInputResult } from './types';
 import { tryParseYaml } from './yaml';
 
 export { decodeBase64, decodeUrlSafeBase64, isLikelyBase64 } from './base64';
@@ -15,7 +15,7 @@ export { parseShadowsocks, parseShadowsocksR } from './protocols/ss';
 export { parseTrojan } from './protocols/trojan';
 export { parseVless } from './protocols/vless';
 export { parseVmess } from './protocols/vmess';
-export type { ParseDiagnostic, ParseInputResult } from './types';
+export type { ParseDiagnostic, ParseError, ParseErrorCode, ParseErrorKind, ParseErrorSeverity, ParseInputResult } from './types';
 export { tryParseYaml } from './yaml';
 
 const PROXY_PREFIXES = [
@@ -163,7 +163,7 @@ const normalizeProxyNames = (proxies: any[], diagnostics: ParseDiagnostic[]) => 
 
 export const parseInput = async (rawInput: string): Promise<ParseInputResult> => {
   const allProxies: any[] = [];
-  const errors: any[] = [];
+  const errors: ParseError[] = [];
   const diagnostics: ParseDiagnostic[] = [];
 
   const trimmed = rawInput.trim();
@@ -205,7 +205,13 @@ export const parseInput = async (rawInput: string): Promise<ParseInputResult> =>
   }
 
   if (httpUrls.length > MAX_SUBSCRIPTION_URLS) {
-    errors.push({ error: `订阅链接数量超过上限：${MAX_SUBSCRIPTION_URLS}` });
+    errors.push(createParseError({
+      code: 'subscription_url_limit_exceeded',
+      kind: 'limit',
+      severity: 'error',
+      message: `订阅链接数量超过上限：${MAX_SUBSCRIPTION_URLS}`,
+      limit: MAX_SUBSCRIPTION_URLS,
+    }));
     httpUrls.length = MAX_SUBSCRIPTION_URLS;
   }
 
@@ -214,7 +220,14 @@ export const parseInput = async (rawInput: string): Promise<ParseInputResult> =>
     if (proxy) {
       allProxies.push(proxy);
     } else {
-      errors.push({ input: line.substring(0, 50), error: 'Failed to parse proxy URI' });
+      errors.push(createParseError({
+        code: 'proxy_uri_parse_failed',
+        kind: 'input',
+        severity: 'error',
+        message: 'Failed to parse proxy URI',
+        source: 'direct',
+        input: line.substring(0, 50),
+      }));
     }
   }
 
@@ -227,13 +240,30 @@ export const parseInput = async (rawInput: string): Promise<ParseInputResult> =>
   for (const result of httpResults) {
     if (result.status === 'fulfilled') {
       if (result.value.proxies.length === 0) {
-        errors.push({ url: result.value.url, error: '成功连接到链接，但在内容中未能解析出任何有效节点，可能是源站返回了防盗链或非节点页面' });
+        errors.push(createParseError({
+          code: 'subscription_empty',
+          kind: 'subscription',
+          severity: 'warning',
+          message: '成功连接到链接，但在内容中未能解析出任何有效节点，可能是源站返回了防盗链或非节点页面',
+          source: 'subscription',
+          url: result.value.url,
+        }));
       } else {
         allProxies.push(...result.value.proxies);
       }
     } else {
       const url = httpUrls[httpResults.indexOf(result)];
-      errors.push({ url, error: result.reason?.message || 'Unknown error' });
+      const cause = result.reason?.message || 'Unknown error';
+      const isParserError = result.reason instanceof SubscriptionParseError;
+      errors.push(createParseError({
+        code: isParserError ? result.reason.code : 'subscription_fetch_failed',
+        kind: isParserError ? result.reason.kind : 'network',
+        severity: 'error',
+        message: cause,
+        source: 'subscription',
+        url,
+        cause,
+      }));
     }
   }
 

@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "clean": "rimraf .next .next-dev dist server.cjs",
+    "test": "node --import tsx --test src/lib/server/parser/parser.test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "pnpm typecheck",
     "db:generate": "drizzle-kit generate",

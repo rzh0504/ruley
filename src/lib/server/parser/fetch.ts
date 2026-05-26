@@ -1,10 +1,23 @@
 import axios from 'axios';
 import dns from 'dns/promises';
 import net from 'net';
+import type { ParseErrorCode, ParseErrorKind } from './types';
 
 const MAX_SUBSCRIPTION_BYTES = Number(process.env.MAX_SUBSCRIPTION_BYTES || 5 * 1024 * 1024);
 const SUBSCRIPTION_TIMEOUT_MS = Number(process.env.SUBSCRIPTION_TIMEOUT_MS || 15000);
 const ALLOW_HTTP_SUBSCRIPTIONS = process.env.ALLOW_HTTP_SUBSCRIPTIONS === 'true';
+
+export class SubscriptionParseError extends Error {
+  code: ParseErrorCode;
+  kind: ParseErrorKind;
+
+  constructor(code: ParseErrorCode, kind: ParseErrorKind, message: string) {
+    super(message);
+    this.name = 'SubscriptionParseError';
+    this.code = code;
+    this.kind = kind;
+  }
+}
 
 const isBlockedIp = (address: string): boolean => {
   if (address === '169.254.169.254') return true;
@@ -46,20 +59,20 @@ const assertSafeSubscriptionUrl = async (rawUrl: string) => {
   try {
     parsed = new URL(rawUrl);
   } catch {
-    throw new Error('订阅链接格式无效');
+    throw new SubscriptionParseError('subscription_url_invalid', 'subscription', '订阅链接格式无效');
   }
 
   if (parsed.protocol !== 'https:' && !(ALLOW_HTTP_SUBSCRIPTIONS && parsed.protocol === 'http:')) {
-    throw new Error('订阅链接仅允许 HTTPS');
+    throw new SubscriptionParseError('subscription_url_insecure', 'subscription', '订阅链接仅允许 HTTPS');
   }
 
   if (!parsed.hostname || parsed.username || parsed.password) {
-    throw new Error('订阅链接格式不安全');
+    throw new SubscriptionParseError('subscription_url_unsafe', 'subscription', '订阅链接格式不安全');
   }
 
   const host = parsed.hostname.toLowerCase();
   if (host === 'localhost' || host.endsWith('.localhost')) {
-    throw new Error('订阅链接不能指向本机地址');
+    throw new SubscriptionParseError('subscription_url_private_address', 'subscription', '订阅链接不能指向本机地址');
   }
 
   const literalIpType = net.isIP(host);
@@ -68,7 +81,7 @@ const assertSafeSubscriptionUrl = async (rawUrl: string) => {
     : await dns.lookup(host, { all: true, verbatim: false });
 
   if (addresses.length === 0 || addresses.some(record => isBlockedIp(record.address))) {
-    throw new Error('订阅链接不能指向内网或保留地址');
+    throw new SubscriptionParseError('subscription_url_private_address', 'subscription', '订阅链接不能指向内网或保留地址');
   }
 };
 
