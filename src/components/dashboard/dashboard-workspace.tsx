@@ -1,6 +1,12 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
+import {
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
 import { useSearchParams } from "next/navigation";
 import hljs from "highlight.js/lib/core";
 import yamlLanguage from "highlight.js/lib/languages/yaml";
@@ -59,6 +65,17 @@ import {
   serializeSubscriptionSources,
   type SubscriptionSource,
 } from "@/lib/subscription-sources";
+import {
+  defaultAdvancedSettings,
+  defaultProxyGroupPreferences,
+  getStoredDefaultAdvancedSettings,
+  getStoredParserPreferences,
+  getStoredProxyGroupPreferences,
+  normalizeAdvancedSettings,
+  serializeAdvancedSettings,
+  type AdvancedSettings,
+  type ProxyGroupPreferences,
+} from "@/lib/preferences";
 
 hljs.registerLanguage("yaml", yamlLanguage);
 
@@ -102,22 +119,14 @@ type ConfigRecord = {
   cloudUrl?: string | null;
 };
 
-type AdvancedSettings = {
-  port: number;
-  socksPort: number;
-  allowLan: boolean;
-  mode: string;
-  logLevel: string;
-  externalController: string;
-  secret: string;
-  advancedDns: boolean;
-};
-
-const defaultGroups = () =>
+const defaultGroups = (
+  preferences: ProxyGroupPreferences = defaultProxyGroupPreferences,
+) =>
   PROXY_GROUP_TEMPLATES.filter((template) =>
-    ["1", "2", "3", "6", "25", "23"].includes(template.id),
+    preferences.defaultEnabledGroupIds.includes(template.id),
   ).map((template) => ({
     ...template,
+    type: preferences.defaultProxyGroupType,
     ruleLinks: getDefaultRuleLinks(template),
   }));
 
@@ -144,34 +153,8 @@ const yamlFoldableSections = new Map([
   ["rules", "rules"],
 ]);
 
-const defaultAdvancedSettings: AdvancedSettings = {
-  port: 7897,
-  socksPort: 0,
-  allowLan: true,
-  mode: "rule",
-  logLevel: "info",
-  externalController: "",
-  secret: "set-your-secret",
-  advancedDns: true,
-};
-
 const initialVisibleRuleCount = 50;
 const visibleRuleStep = 50;
-
-const normalizeAdvancedSettings = (
-  settings?: Partial<AdvancedSettings> | null,
-): AdvancedSettings => ({
-  ...defaultAdvancedSettings,
-  ...settings,
-  advancedDns: typeof settings?.advancedDns === "boolean" ? settings.advancedDns : defaultAdvancedSettings.advancedDns,
-  port: Number(settings?.port || defaultAdvancedSettings.port),
-  socksPort: Number(settings?.socksPort || defaultAdvancedSettings.socksPort),
-});
-
-const serializeAdvancedSettings = (settings: AdvancedSettings) => ({
-  ...settings,
-  socksPort: settings.socksPort > 0 ? settings.socksPort : undefined,
-});
 
 const getWorkspaceSignature = ({
   nodes,
@@ -183,11 +166,18 @@ const getWorkspaceSignature = ({
   groups: ProxyGroupTemplate[];
   rules: RuleItem[];
   settings: AdvancedSettings;
-}) => JSON.stringify({ nodes, groups, rules, settings: serializeAdvancedSettings(settings) });
+}) =>
+  JSON.stringify({
+    nodes,
+    groups,
+    rules,
+    settings: serializeAdvancedSettings(settings),
+  });
 
 const getDisplayCloudUrl = (cloudUrl?: string | null) => {
   if (!cloudUrl) return "";
-  if (/^https?:\/\//.test(cloudUrl) || typeof window === "undefined") return cloudUrl;
+  if (/^https?:\/\//.test(cloudUrl) || typeof window === "undefined")
+    return cloudUrl;
   return window.location.origin + cloudUrl;
 };
 
@@ -202,7 +192,9 @@ const getInitialWorkspaceState = (config?: ConfigRecord | null) => {
     nodes: config?.parsedNodes || [],
     groups: config?.proxyGroups?.length ? config.proxyGroups : defaultGroups(),
     rules: config?.rules || [],
-    advancedSettings: normalizeAdvancedSettings(config?.settings),
+    advancedSettings: config
+      ? normalizeAdvancedSettings(config.settings)
+      : defaultAdvancedSettings,
     generatedConfig: config?.generatedConfig || "",
     cloudUrl: getDisplayCloudUrl(config?.cloudUrl),
   };
@@ -234,7 +226,12 @@ const matchNodesByFilter = (
 
 const isBuiltInPolicyFilter = (filter: string) => {
   const normalized = filter.replace(/\s/g, "").toUpperCase();
-  return normalized === "DIRECT" || normalized === "REJECT" || normalized === "(REJECT|DIRECT)" || normalized === "(DIRECT|REJECT)";
+  return (
+    normalized === "DIRECT" ||
+    normalized === "REJECT" ||
+    normalized === "(REJECT|DIRECT)" ||
+    normalized === "(DIRECT|REJECT)"
+  );
 };
 
 const validateWorkspace = ({
@@ -387,8 +384,13 @@ function HighlightedYaml({
     >
       <code>
         {highlightedLines.map((line, index) => (
-          <span className="yaml-highlight-line" key={`${startLine + index}-${line}`}>
-            <span className="yaml-highlight-line-number">{startLine + index}</span>
+          <span
+            className="yaml-highlight-line"
+            key={`${startLine + index}-${line}`}
+          >
+            <span className="yaml-highlight-line-number">
+              {startLine + index}
+            </span>
             <span
               className="yaml-highlight-line-code"
               dangerouslySetInnerHTML={{ __html: line || " " }}
@@ -444,7 +446,9 @@ function AdvancedSettingsDialog({
                   value={settings.port}
                   onChange={(event) =>
                     onChange({
-                      port: Number(event.target.value || defaultAdvancedSettings.port),
+                      port: Number(
+                        event.target.value || defaultAdvancedSettings.port,
+                      ),
                     })
                   }
                 />
@@ -488,6 +492,31 @@ function AdvancedSettingsDialog({
                   ]}
                   value={settings.logLevel}
                   onChange={(logLevel) => onChange({ logLevel })}
+                />
+              </label>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="flex flex-col gap-2 text-sm font-medium">
+                测速 URL
+                <Input
+                  nativeInput
+                  value={settings.testUrl}
+                  onChange={(event) => onChange({ testUrl: event.target.value })}
+                  placeholder={defaultAdvancedSettings.testUrl}
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-medium">
+                测速间隔
+                <Input
+                  nativeInput
+                  type="number"
+                  value={settings.testInterval}
+                  onChange={(event) =>
+                    onChange({
+                      testInterval: Number(event.target.value || defaultAdvancedSettings.testInterval),
+                    })
+                  }
                 />
               </label>
             </div>
@@ -536,18 +565,32 @@ function AdvancedSettingsDialog({
   );
 }
 
-export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRecord | null }) {
+export function DashboardWorkspace({
+  initialConfig,
+}: {
+  initialConfig?: ConfigRecord | null;
+}) {
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const initialState = getInitialWorkspaceState(initialConfig);
   const [name, setName] = useState(initialState.name);
   const [urls, setUrls] = useState(initialState.urls);
-  const [sources, setSources] = useState<SubscriptionSource[]>(initialState.sources);
-  const [nodes, setNodes] = useState<Record<string, unknown>[]>(initialState.nodes);
-  const [groups, setGroups] = useState<ProxyGroupTemplate[]>(initialState.groups);
+  const [sources, setSources] = useState<SubscriptionSource[]>(
+    initialState.sources,
+  );
+  const [nodes, setNodes] = useState<Record<string, unknown>[]>(
+    initialState.nodes,
+  );
+  const [groups, setGroups] = useState<ProxyGroupTemplate[]>(
+    initialState.groups,
+  );
   const [rules, setRules] = useState<RuleItem[]>(initialState.rules);
-  const [advancedSettings, setAdvancedSettings] = useState<AdvancedSettings>(initialState.advancedSettings);
-  const [generatedConfig, setGeneratedConfig] = useState(initialState.generatedConfig);
+  const [advancedSettings, setAdvancedSettings] = useState<AdvancedSettings>(
+    initialState.advancedSettings,
+  );
+  const [generatedConfig, setGeneratedConfig] = useState(
+    initialState.generatedConfig,
+  );
   const [generatedConfigSignature, setGeneratedConfigSignature] = useState(
     initialState.generatedConfig
       ? getWorkspaceSignature({
@@ -559,8 +602,12 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
       : "",
   );
   const [cloudUrl, setCloudUrl] = useState(initialState.cloudUrl);
-  const [currentConfigId, setCurrentConfigId] = useState<number | null>(initialState.currentConfigId);
-  const [visibleRuleCount, setVisibleRuleCount] = useState(initialVisibleRuleCount);
+  const [currentConfigId, setCurrentConfigId] = useState<number | null>(
+    initialState.currentConfigId,
+  );
+  const [visibleRuleCount, setVisibleRuleCount] = useState(
+    initialVisibleRuleCount,
+  );
   const [parseErrors, setParseErrors] = useState<ParseErrorRecord[]>([]);
   const [parseDiagnostics, setParseDiagnostics] = useState<ParseDiagnostic[]>(
     [],
@@ -579,6 +626,18 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
     Record<string, SourcePreviewState>
   >({});
 
+  useEffect(() => {
+    if (initialConfig || searchParams.get("configId")) return;
+    const proxyGroupPreferences = getStoredProxyGroupPreferences();
+    const advancedDefaults = getStoredDefaultAdvancedSettings();
+    setAdvancedSettings({
+      ...advancedDefaults,
+      testUrl: proxyGroupPreferences.defaultTestUrl,
+      testInterval: proxyGroupPreferences.defaultTestInterval,
+    });
+    setGroups(defaultGroups(proxyGroupPreferences));
+  }, [initialConfig, searchParams]);
+
   const policies = useMemo(
     () => [
       ...groups.map((group) => `${group.icon} ${group.name}`),
@@ -589,12 +648,28 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
   );
 
   const workspaceSignature = useMemo(
-    () => getWorkspaceSignature({ nodes, groups, rules, settings: advancedSettings }),
+    () =>
+      getWorkspaceSignature({
+        nodes,
+        groups,
+        rules,
+        settings: advancedSettings,
+      }),
     [nodes, groups, rules, advancedSettings],
   );
-  const isGeneratedConfigCurrent = Boolean(generatedConfig && generatedConfigSignature === workspaceSignature);
-  const yamlStatus = !generatedConfig ? "未生成" : isGeneratedConfigCurrent ? "已同步" : "需重新生成";
-  const yamlStatusVariant: "outline" | "success" | "warning" = !generatedConfig ? "outline" : isGeneratedConfigCurrent ? "success" : "warning";
+  const isGeneratedConfigCurrent = Boolean(
+    generatedConfig && generatedConfigSignature === workspaceSignature,
+  );
+  const yamlStatus = !generatedConfig
+    ? "未生成"
+    : isGeneratedConfigCurrent
+      ? "已同步"
+      : "需重新生成";
+  const yamlStatusVariant: "outline" | "success" | "warning" = !generatedConfig
+    ? "outline"
+    : isGeneratedConfigCurrent
+      ? "success"
+      : "warning";
 
   const syncSources = (nextSources: SubscriptionSource[]) => {
     setSources(nextSources);
@@ -704,6 +779,7 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         urls: serializeSubscriptionSources([{ ...source, enabled: true }]),
+        options: getStoredParserPreferences(),
       }),
     });
     const data = await response.json();
@@ -805,7 +881,7 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
       const response = await fetch("/api/parse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ urls }),
+        body: JSON.stringify({ urls, options: getStoredParserPreferences() }),
       });
       const data = await response.json();
       if (!data.success) {
@@ -899,7 +975,9 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
           rules,
           settings: serializeAdvancedSettings(advancedSettings),
           parsedNodes: nodes,
-          generatedConfig: isGeneratedConfigCurrent ? generatedConfig : undefined,
+          generatedConfig: isGeneratedConfigCurrent
+            ? generatedConfig
+            : undefined,
         }),
       });
       const data = await response.json();
@@ -933,7 +1011,7 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
   return (
     <AppShell>
       <div className="flex flex-col gap-6">
-        <section className="sticky top-[4.25rem] z-30 flex flex-col gap-3 rounded-xl border bg-background/95 p-3 backdrop-blur md:flex-row md:items-center md:justify-between">
+        <section className="sticky top-17 z-30 flex flex-col gap-3 rounded-xl border bg-background/95 p-3 backdrop-blur md:flex-row md:items-center md:justify-between">
           <div className="flex flex-col gap-1">
             <h1 className="text-3xl font-semibold tracking-tight">
               配置工作台
@@ -1502,7 +1580,11 @@ export function DashboardWorkspace({ initialConfig }: { initialConfig?: ConfigRe
               {visibleRuleCount < rules.length && (
                 <Button
                   variant="outline"
-                  onClick={() => setVisibleRuleCount((count) => Math.min(count + visibleRuleStep, rules.length))}
+                  onClick={() =>
+                    setVisibleRuleCount((count) =>
+                      Math.min(count + visibleRuleStep, rules.length),
+                    )
+                  }
                 >
                   加载更多规则（{visibleRuleCount}/{rules.length}）
                 </Button>

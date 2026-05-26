@@ -6,6 +6,11 @@ export const loginSchema = z.object({
 
 export const parseSchema = z.object({
   urls: z.string().min(1),
+  options: z.object({
+    skipDuplicateNodes: z.boolean().optional(),
+    duplicateNameStrategy: z.enum(["append", "keep", "skip"]).optional(),
+    continueOnParseError: z.boolean().optional(),
+  }).optional(),
 });
 
 export const generateSchema = z.object({

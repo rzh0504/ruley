@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import type React from "react";
-import { LaptopIcon, LogOutIcon, MoonIcon, PanelsTopLeftIcon, ServerCogIcon, SunIcon } from "lucide-react";
+import { LaptopIcon, MoonIcon, PanelsTopLeftIcon, ServerCogIcon, SettingsIcon, SunIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,59 +13,48 @@ import {
   MenuRadioItem,
   MenuTrigger,
 } from "@/components/ui/menu";
-import { toastManager } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
+import {
+  applyTheme,
+  getStoredThemeMode,
+  setStoredThemeMode,
+  themeLabels,
+  themeStorageKey,
+  type ThemeMode,
+} from "@/lib/preferences";
 
 const navItems = [
   { href: "/dashboard", label: "工作台", icon: PanelsTopLeftIcon },
   { href: "/configs", label: "配置管理", icon: ServerCogIcon },
 ];
 
-type ThemeMode = "system" | "light" | "dark";
-
-const themeLabels: Record<ThemeMode, string> = {
-  system: "跟随设备",
-  light: "浅色",
-  dark: "深色",
-};
-
-function applyTheme(mode: ThemeMode) {
-  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  document.documentElement.classList.toggle("dark", mode === "dark" || (mode === "system" && prefersDark));
-}
-
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [themeMode, setThemeMode] = useState<ThemeMode>("system");
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem("ruley-theme") as ThemeMode | null;
-    const initial = stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
+    const initial = getStoredThemeMode();
     setThemeMode(initial);
     applyTheme(initial);
 
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const handleSystemThemeChange = () => {
-      if ((localStorage.getItem("ruley-theme") || "system") === "system") applyTheme("system");
+      if ((localStorage.getItem(themeStorageKey) || "system") === "system") applyTheme("system");
     };
+    const handlePreferencesChange = () => setThemeMode(getStoredThemeMode());
     media.addEventListener("change", handleSystemThemeChange);
-    return () => media.removeEventListener("change", handleSystemThemeChange);
+    window.addEventListener("ruley-preferences-change", handlePreferencesChange);
+    return () => {
+      media.removeEventListener("change", handleSystemThemeChange);
+      window.removeEventListener("ruley-preferences-change", handlePreferencesChange);
+    };
   }, []);
 
   const setTheme = (mode: ThemeMode) => {
     setThemeMode(mode);
-    localStorage.setItem("ruley-theme", mode);
-    applyTheme(mode);
+    setStoredThemeMode(mode);
     setThemeMenuOpen(false);
-  };
-
-  const logout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    toastManager.add({ type: "success", title: "已退出登录" });
-    router.replace("/login");
-    router.refresh();
   };
 
   return (
@@ -92,7 +81,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
           <div className="flex items-center gap-2">
-            <Menu open={themeMenuOpen} onOpenChange={setThemeMenuOpen}>
+            <Menu modal={false} open={themeMenuOpen} onOpenChange={setThemeMenuOpen}>
               <MenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`当前主题：${themeLabels[themeMode]}`} title={`当前主题：${themeLabels[themeMode]}`} />}>
                 {themeMode === "system" ? <LaptopIcon aria-hidden="true" /> : themeMode === "dark" ? <MoonIcon aria-hidden="true" /> : <SunIcon aria-hidden="true" />}
               </MenuTrigger>
@@ -104,9 +93,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </MenuRadioGroup>
               </MenuPopup>
             </Menu>
-            <Button variant="outline" size="sm" onClick={logout}>
-              <LogOutIcon aria-hidden="true" />
-              退出
+            <Button render={<Link href="/settings" />} variant={pathname === "/settings" ? "secondary" : "outline"} size="sm">
+              <SettingsIcon aria-hidden="true" />
+              设置
             </Button>
           </div>
         </div>

@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   if (!body.success) return jsonError('"urls" string is required.');
 
   try {
-    const result = await parseInput(getActiveSubscriptionInput(body.data.urls));
+    const result = await parseInput(getActiveSubscriptionInput(body.data.urls), body.data.options);
     return NextResponse.json({
       success: true,
       nodesCount: result.proxies.length,

@@ -38,6 +38,8 @@ export interface GenerateRequest {
     externalController?: string;
     secret?: string;
     advancedDns?: boolean;
+    testUrl?: string;
+    testInterval?: number;
   };
 }
 
@@ -139,7 +141,8 @@ export const generateConfig = (req: GenerateRequest): string => {
 
   const {
     port = 7897, socksPort, allowLan = true, mode = 'rule', logLevel = 'info',
-    externalController = '', secret = 'set-your-secret', advancedDns = true
+    externalController = '', secret = 'set-your-secret', advancedDns = true,
+    testUrl = 'https://www.gstatic.com/generate_204', testInterval = 300
   } = settings;
 
   const proxies = rawProxies;
@@ -184,8 +187,8 @@ export const generateConfig = (req: GenerateRequest): string => {
     };
 
     if (actualType === 'url-test' || actualType === 'fallback') {
-      mihomoGroup.url = 'https://www.gstatic.com/generate_204';
-      mihomoGroup.interval = 300;
+      mihomoGroup.url = testUrl;
+      mihomoGroup.interval = testInterval;
       mihomoGroup.lazy = false;
     }
 

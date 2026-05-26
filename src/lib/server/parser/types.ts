@@ -6,6 +6,14 @@ export type ParseDiagnostic = {
   to?: string;
 };
 
+export type DuplicateNameStrategy = 'append' | 'keep' | 'skip';
+
+export type ParseOptions = {
+  skipDuplicateNodes?: boolean;
+  duplicateNameStrategy?: DuplicateNameStrategy;
+  continueOnParseError?: boolean;
+};
+
 export type ProxyScalar = string | number | boolean | null;
 export type ProxyValue = ProxyScalar | ProxyValue[] | { [key: string]: ProxyValue };
 

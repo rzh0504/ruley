@@ -5,7 +5,7 @@ import { parseShadowsocks, parseShadowsocksR } from './protocols/ss';
 import { parseTrojan } from './protocols/trojan';
 import { parseVless } from './protocols/vless';
 import { parseVmess } from './protocols/vmess';
-import { createParseError, type MihomoProxy, type ParseDiagnostic, type ParseError, type ParseInputResult } from './types';
+import { createParseError, type MihomoProxy, type ParseDiagnostic, type ParseError, type ParseInputResult, type ParseOptions } from './types';
 import { tryParseYaml } from './yaml';
 
 export { decodeBase64, decodeUrlSafeBase64, isLikelyBase64 } from './base64';
@@ -15,7 +15,7 @@ export { parseShadowsocks, parseShadowsocksR } from './protocols/ss';
 export { parseTrojan } from './protocols/trojan';
 export { parseVless } from './protocols/vless';
 export { parseVmess } from './protocols/vmess';
-export type { MihomoProxy, ParseDiagnostic, ParseError, ParseErrorCode, ParseErrorKind, ParseErrorSeverity, ParseInputResult } from './types';
+export type { MihomoProxy, ParseDiagnostic, ParseError, ParseErrorCode, ParseErrorKind, ParseErrorSeverity, ParseInputResult, ParseOptions } from './types';
 export { tryParseYaml } from './yaml';
 
 const PROXY_PREFIXES = [
@@ -123,7 +123,11 @@ const getProxyIdentity = (proxy: MihomoProxy) => {
   return [proxy.type, proxy.server, proxy.port, credential].map(value => String(value || '')).join('|');
 };
 
-const normalizeProxyNames = (proxies: MihomoProxy[], diagnostics: ParseDiagnostic[]) => {
+const normalizeProxyNames = (proxies: MihomoProxy[], diagnostics: ParseDiagnostic[], options: ParseOptions = {}) => {
+  const {
+    skipDuplicateNodes = true,
+    duplicateNameStrategy = 'append',
+  } = options;
   const seenIdentity = new Set<string>();
   const nameCounts = new Map<string, number>();
   const normalized: MihomoProxy[] = [];
@@ -134,9 +138,11 @@ const normalizeProxyNames = (proxies: MihomoProxy[], diagnostics: ParseDiagnosti
       diagnostics.push({
         type: 'duplicate',
         name: String(proxy.name || 'Unnamed'),
-        message: `已移除重复节点：${String(proxy.name || 'Unnamed')}`,
+        message: skipDuplicateNodes
+          ? `已移除重复节点：${String(proxy.name || 'Unnamed')}`
+          : `保留重复节点：${String(proxy.name || 'Unnamed')}`,
       });
-      continue;
+      if (skipDuplicateNodes) continue;
     }
     seenIdentity.add(identity);
 
@@ -145,6 +151,20 @@ const normalizeProxyNames = (proxies: MihomoProxy[], diagnostics: ParseDiagnosti
     nameCounts.set(baseName, count + 1);
     if (count === 0) {
       normalized.push({ ...proxy, name: baseName });
+      continue;
+    }
+
+    if (duplicateNameStrategy === 'keep') {
+      normalized.push({ ...proxy, name: baseName });
+      continue;
+    }
+
+    if (duplicateNameStrategy === 'skip') {
+      diagnostics.push({
+        type: 'skipped',
+        name: baseName,
+        message: `已跳过同名节点：${baseName}`,
+      });
       continue;
     }
 
@@ -161,7 +181,7 @@ const normalizeProxyNames = (proxies: MihomoProxy[], diagnostics: ParseDiagnosti
   return normalized;
 };
 
-export const parseInput = async (rawInput: string): Promise<ParseInputResult> => {
+export const parseInput = async (rawInput: string, options: ParseOptions = {}): Promise<ParseInputResult> => {
   const allProxies: MihomoProxy[] = [];
   const errors: ParseError[] = [];
   const diagnostics: ParseDiagnostic[] = [];
@@ -171,7 +191,7 @@ export const parseInput = async (rawInput: string): Promise<ParseInputResult> =>
 
   const yamlProxies = tryParseYaml(trimmed);
   if (yamlProxies && yamlProxies.length > 0) {
-    return { proxies: normalizeProxyNames(yamlProxies, diagnostics), errors, diagnostics };
+    return { proxies: normalizeProxyNames(yamlProxies, diagnostics, options), errors, diagnostics };
   }
 
   if (isLikelyBase64(trimmed)) {
@@ -179,11 +199,11 @@ export const parseInput = async (rawInput: string): Promise<ParseInputResult> =>
     if (decoded) {
       const yamlFromB64 = tryParseYaml(decoded);
       if (yamlFromB64 && yamlFromB64.length > 0) {
-        return { proxies: normalizeProxyNames(yamlFromB64, diagnostics), errors, diagnostics };
+        return { proxies: normalizeProxyNames(yamlFromB64, diagnostics, options), errors, diagnostics };
       }
       const proxiesFromB64 = parseLinesAsProxies(decoded);
       if (proxiesFromB64.length > 0) {
-        return { proxies: normalizeProxyNames(proxiesFromB64, diagnostics), errors, diagnostics };
+        return { proxies: normalizeProxyNames(proxiesFromB64, diagnostics, options), errors, diagnostics };
       }
     }
   }
@@ -264,6 +284,7 @@ export const parseInput = async (rawInput: string): Promise<ParseInputResult> =>
         url,
         cause,
       }));
+      if (options.continueOnParseError === false) break;
     }
   }
 
@@ -277,5 +298,5 @@ export const parseInput = async (rawInput: string): Promise<ParseInputResult> =>
     }
   }
 
-  return { proxies: normalizeProxyNames(allProxies, diagnostics), errors, diagnostics };
+  return { proxies: normalizeProxyNames(allProxies, diagnostics, options), errors, diagnostics };
 };

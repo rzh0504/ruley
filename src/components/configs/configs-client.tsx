@@ -5,6 +5,16 @@ import { useDeferredValue, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CloudIcon, ExternalLinkIcon, GitBranchIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
+import {
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogPopup,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -36,6 +46,8 @@ const configSorts: { value: ConfigSort; label: string }[] = [
   { value: "nodes", label: "节点数" },
 ];
 
+const selectedToggleClassName = "border-primary/60 bg-primary/12 text-foreground ring-1 ring-primary/24 dark:border-primary/80 dark:bg-primary/18 dark:ring-primary/36";
+
 export function ConfigsClient({ initialConfigs }: { initialConfigs: ConfigRecord[] }) {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
@@ -55,7 +67,6 @@ export function ConfigsClient({ initialConfigs }: { initialConfigs: ConfigRecord
   });
 
   const deleteConfig = async (publicId: string) => {
-    if (!confirm("确定删除这个配置吗？")) return;
     const response = await fetch(`/api/configs/${publicId}`, { method: "DELETE" });
     const payload = await response.json();
     if (!payload.success) {
@@ -127,6 +138,7 @@ export function ConfigsClient({ initialConfigs }: { initialConfigs: ConfigRecord
                   key={item.value}
                   variant={filter === item.value ? "secondary" : "outline"}
                   size="sm"
+                  className={filter === item.value ? selectedToggleClassName : undefined}
                   onClick={() => setFilter(item.value)}
                 >
                   {item.label}
@@ -139,6 +151,7 @@ export function ConfigsClient({ initialConfigs }: { initialConfigs: ConfigRecord
                   key={item.value}
                   variant={sort === item.value ? "secondary" : "outline"}
                   size="sm"
+                  className={sort === item.value ? selectedToggleClassName : undefined}
                   onClick={() => setSort(item.value)}
                 >
                   {item.label}
@@ -174,19 +187,37 @@ export function ConfigsClient({ initialConfigs }: { initialConfigs: ConfigRecord
                     </div>
                     <CardDescription>{config.nodeCount || 0} 个节点，更新于 {new Date(config.updatedAt).toLocaleString("zh-CN")}</CardDescription>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button render={<Link href={`/dashboard?configId=${config.publicId}`} />} variant="secondary" size="sm">
+                  <div className="grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
+                    <Button render={<Link href={`/dashboard?configId=${config.publicId}`} />} variant="secondary" size="sm" className="w-full sm:w-auto">
                       <ExternalLinkIcon aria-hidden="true" />
                       加载
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => generateCloud(config)}>
-                      <CloudIcon aria-hidden="true" />
-                      链接
-                    </Button>
-                    <Button variant="destructive-outline" size="sm" onClick={() => deleteConfig(config.publicId)}>
-                      <Trash2Icon aria-hidden="true" />
-                      删除
-                    </Button>
+                    <div className="grid grid-cols-2 gap-2 sm:contents">
+                      <Button variant="outline" size="sm" onClick={() => generateCloud(config)} className="w-full sm:w-auto">
+                        <CloudIcon aria-hidden="true" />
+                        链接
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger render={<Button variant="destructive-outline" size="sm" className="w-full sm:w-auto" />}>
+                          <Trash2Icon aria-hidden="true" />
+                          删除
+                        </AlertDialogTrigger>
+                        <AlertDialogPopup>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>删除配置</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              将删除“{config.name}”。如果它有分支，关联分支也会一起删除。此操作不可撤销。
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogClose render={<Button variant="ghost" />}>取消</AlertDialogClose>
+                            <AlertDialogClose render={<Button variant="destructive" onClick={() => deleteConfig(config.publicId)} />}>
+                              删除
+                            </AlertDialogClose>
+                          </AlertDialogFooter>
+                        </AlertDialogPopup>
+                      </AlertDialog>
+                    </div>
                   </div>
                 </CardHeader>
               </Card>
