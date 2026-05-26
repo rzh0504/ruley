@@ -1,5 +1,5 @@
 # Ruley
-<img width="1921" height="1081" alt="image" src="https://github.com/user-attachments/assets/59624f88-cdab-4f90-bd12-5e483e9dab96" />
+![ruley.png](https://s3.bmp.ovh/2026/05/26/jIyMqPM2.png)
 
 
 一个用于解析订阅、整理节点规则并生成 `Mihomo` 配置的 Web 工具。
