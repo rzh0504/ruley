@@ -65,7 +65,7 @@ export function ConfigsClient() {
           <div className="flex flex-col gap-1">
             <Badge variant="info" className="w-fit">Neon Postgres</Badge>
             <h1 className="text-3xl font-semibold tracking-tight">配置管理</h1>
-            <p className="text-muted-foreground">查看、加载、删除和生成云端订阅链接。</p>
+            <p className="text-muted-foreground">查看、加载、删除和生成云端订阅链接</p>
           </div>
           <Button variant="outline" onClick={() => refetch()}>
             <RefreshCwIcon aria-hidden="true" />
@@ -76,7 +76,7 @@ export function ConfigsClient() {
         {isLoading ? (
           <Card><CardContent className="p-8 text-muted-foreground">加载中...</CardContent></Card>
         ) : configs.length === 0 ? (
-          <Card><CardContent className="p-8 text-muted-foreground">暂无配置，请先在工作台保存托管。</CardContent></Card>
+          <Card><CardContent className="p-8 text-muted-foreground">暂无配置，请先在工作台保存托管</CardContent></Card>
         ) : (
           <div className="grid gap-4">
             {configs.map((config) => (

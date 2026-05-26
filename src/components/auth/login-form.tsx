@@ -51,7 +51,7 @@ export function LoginForm() {
           </div>
           <div className="flex flex-col gap-1">
             <CardTitle>登录 Ruley</CardTitle>
-            <CardDescription>输入管理员密码以管理订阅配置和云端链接。</CardDescription>
+            <CardDescription>输入管理员密码以管理订阅配置和云端链接</CardDescription>
           </div>
         </CardHeader>
         <CardContent>

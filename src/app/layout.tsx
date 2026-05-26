@@ -10,7 +10,7 @@ const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
   title: "Ruley",
-  description: "解析订阅、整理节点规则并生成 Mihomo 配置的 Web 工具。",
+  description: "解析订阅、整理节点规则并生成 Mihomo 配置的 Web 工具",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

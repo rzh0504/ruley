@@ -884,7 +884,7 @@ export const parseInput = async (rawInput: string): Promise<{ proxies: any[], er
   for (const result of httpResults) {
     if (result.status === 'fulfilled') {
       if (result.value.proxies.length === 0) {
-        errors.push({ url: result.value.url, error: '成功连接到链接，但在内容中未能解析出任何有效节点，可能是源站返回了防盗链或非节点页面。' });
+        errors.push({ url: result.value.url, error: '成功连接到链接，但在内容中未能解析出任何有效节点，可能是源站返回了防盗链或非节点页面' });
       } else {
         allProxies.push(...result.value.proxies);
       }
