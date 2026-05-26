@@ -68,7 +68,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-40 border-b bg-background/88 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 lg:px-6">
           <Link href={dashboardHref} className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground font-semibold">R</div>
+            <img src="/ruley.svg" alt="" className="size-9 -translate-y-0.5 dark:invert" />
             <div className="flex flex-col leading-tight">
               <span className="font-semibold">Ruley</span>
               <span className="text-muted-foreground text-xs">Mihomo config workspace</span>

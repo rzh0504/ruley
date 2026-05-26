@@ -19,3 +19,29 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  subscription-refresher:
+    image: curlimages/curl:8.16.0
+    container_name: ruley-subscription-refresher
+    restart: unless-stopped
+    depends_on:
+      - ruley
+    environment:
+      ENABLE_AUTOUPDATE: "${ENABLE_AUTOUPDATE:-false}"
+      CRON_SECRET: "${CRON_SECRET}"
+      REFRESH_INTERVAL_SECONDS: "${REFRESH_INTERVAL_SECONDS:-21600}"
+      REFRESH_URL: "http://ruley:4000/api/internal/refresh-subscriptions"
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      if [ "$${ENABLE_AUTOUPDATE}" != "true" ]; then
+        echo "Subscription auto refresh is disabled because ENABLE_AUTOUPDATE is not true.";
+        while true; do sleep 86400; done;
+      fi;
+      if [ -z "$${CRON_SECRET}" ]; then
+        echo "Subscription auto refresh is enabled but CRON_SECRET is not set.";
+        while true; do sleep 86400; done;
+      fi;
+      while true; do
+        curl -fsS -X POST "$${REFRESH_URL}" -H "Authorization: Bearer $${CRON_SECRET}" || true;
+        sleep "$${REFRESH_INTERVAL_SECONDS}";
+      done
