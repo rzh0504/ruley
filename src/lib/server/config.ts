@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { parseInput } from "@/lib/server/parser";
 import { generateConfig } from "@/lib/server/generator";
+import { getActiveSubscriptionInput } from "@/lib/subscription-sources";
 
 const tokenBytes = 32;
 
@@ -41,7 +42,7 @@ export const buildCurrentConfig = async ({
 }) => {
   const proxies = Array.isArray(parsedNodes) && parsedNodes.length > 0
     ? parsedNodes
-    : (await parseInput(urls || "")).proxies;
+    : (await parseInput(getActiveSubscriptionInput(urls || ""))).proxies;
   const groups = Array.isArray(proxyGroups) ? proxyGroups : [];
   const ruleItems = Array.isArray(rules) ? rules : [];
   const yamlStr = generateConfig({

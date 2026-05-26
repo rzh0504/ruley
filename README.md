@@ -44,6 +44,7 @@ Vercel 构建命令使用 `pnpm build`。
 | `MAX_SUBSCRIPTION_BYTES`  | 单个订阅响应体大小上限 | `5242880` |
 | `SUBSCRIPTION_TIMEOUT_MS` | 单个订阅请求超时时间 | `15000` |
 | `SUBSCRIPTION_CONCURRENCY` | 订阅抓取并发数 | `4` |
+| `SUBSCRIPTION_CACHE_TTL_MS` | 云端订阅生成缓存有效期，刷新失败时会回退到上一次成功生成的 YAML | `300000` |
 
 ## 本地开发
 

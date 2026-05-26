@@ -8,8 +8,10 @@ import {
   DownloadIcon,
   GitForkIcon,
   PlayIcon,
+  PlusIcon,
   RefreshCwIcon,
   SaveIcon,
+  Trash2Icon,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +36,11 @@ import {
   getDefaultRuleLinks,
   type ProxyGroupTemplate,
 } from "@/lib/config/proxy-templates";
+import {
+  parseSubscriptionSources,
+  serializeSubscriptionSources,
+  type SubscriptionSource,
+} from "@/lib/subscription-sources";
 
 type RuleItem = { id: string; type: string; value: string; policy: string };
 type ParseErrorRecord = { url?: string; input?: string; error?: string };
@@ -168,6 +175,7 @@ export function DashboardWorkspace() {
   const [isPending, startTransition] = useTransition();
   const [name, setName] = useState("ruley");
   const [urls, setUrls] = useState("");
+  const [sources, setSources] = useState<SubscriptionSource[]>([]);
   const [nodes, setNodes] = useState<Record<string, unknown>[]>([]);
   const [groups, setGroups] = useState<ProxyGroupTemplate[]>(defaultGroups);
   const [rules, setRules] = useState<RuleItem[]>([]);
@@ -188,6 +196,36 @@ export function DashboardWorkspace() {
     [groups],
   );
 
+  const syncSources = (nextSources: SubscriptionSource[]) => {
+    setSources(nextSources);
+    setUrls(serializeSubscriptionSources(nextSources));
+  };
+
+  const updateSource = (id: string, updates: Partial<SubscriptionSource>) => {
+    syncSources(
+      sources.map((source) =>
+        source.id === id ? { ...source, ...updates } : source,
+      ),
+    );
+  };
+
+  const addSource = () => {
+    const nextIndex = sources.length + 1;
+    syncSources([
+      ...sources,
+      {
+        id: crypto.randomUUID(),
+        name: `订阅源 ${nextIndex}`,
+        url: "",
+        enabled: true,
+      },
+    ]);
+  };
+
+  const removeSource = (id: string) => {
+    syncSources(sources.filter((source) => source.id !== id));
+  };
+
   useEffect(() => {
     const id = searchParams.get("configId");
     if (!id) return;
@@ -199,6 +237,7 @@ export function DashboardWorkspace() {
       setCurrentConfigId(config.id);
       setName(config.name || "ruley");
       setUrls(config.urls || "");
+      setSources(parseSubscriptionSources(config.urls || ""));
       setAdvancedDns(Boolean(config.advancedDns));
       setGroups(
         config.proxyGroups?.length ? config.proxyGroups : defaultGroups(),
@@ -401,15 +440,61 @@ export function DashboardWorkspace() {
                   onChange={(event) => setName(event.target.value)}
                 />
               </label>
-              <label className="flex flex-col gap-2 text-sm font-medium">
-                订阅来源输入
-                <Textarea
-                  value={urls}
-                  onChange={(event) => setUrls(event.target.value)}
-                  placeholder="每行一个订阅链接，或粘贴 YAML / 节点 URI"
-                  className="min-h-40"
-                />
-              </label>
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm font-medium">订阅源</div>
+                  <Button variant="outline" size="sm" onClick={addSource}>
+                    <PlusIcon aria-hidden="true" />
+                    添加
+                  </Button>
+                </div>
+                {sources.length === 0 ? (
+                  <div className="rounded-xl border p-3 text-sm text-muted-foreground">
+                    暂无订阅源，点击添加后输入订阅链接、节点 URI、Base64 或 YAML。
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {sources.map((source, index) => (
+                      <div key={source.id} className="rounded-xl border p-3">
+                        <div className="mb-3 flex items-center gap-2">
+                          <Switch
+                            checked={source.enabled}
+                            onCheckedChange={(enabled) =>
+                              updateSource(source.id, { enabled })
+                            }
+                          />
+                          <Input
+                            nativeInput
+                            value={source.name}
+                            onChange={(event) =>
+                              updateSource(source.id, {
+                                name: event.target.value,
+                              })
+                            }
+                            aria-label={`订阅源 ${index + 1} 名称`}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeSource(source.id)}
+                            disabled={sources.length <= 1}
+                          >
+                            <Trash2Icon aria-hidden="true" />
+                          </Button>
+                        </div>
+                        <Textarea
+                          value={source.url}
+                          onChange={(event) =>
+                            updateSource(source.id, { url: event.target.value })
+                          }
+                          placeholder="订阅链接、节点 URI、Base64 或 YAML"
+                          className="min-h-24 font-mono text-xs"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="flex items-center justify-between gap-3 rounded-xl border p-3">
                 <div className="flex flex-col gap-1">
                   <span className="text-sm font-medium">高级防泄漏 DNS</span>

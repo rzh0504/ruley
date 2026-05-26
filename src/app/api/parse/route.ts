@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { jsonError, requireApiSession } from "@/lib/api/response";
 import { parseInput } from "@/lib/server/parser";
+import { getActiveSubscriptionInput } from "@/lib/subscription-sources";
 import { parseSchema } from "@/lib/validators/api";
 
 export const runtime = "nodejs";
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
   if (!body.success) return jsonError('"urls" string is required.');
 
   try {
-    const result = await parseInput(body.data.urls);
+    const result = await parseInput(getActiveSubscriptionInput(body.data.urls));
     return NextResponse.json({
       success: true,
       nodesCount: result.proxies.length,
