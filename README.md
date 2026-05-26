@@ -59,7 +59,7 @@ Vercel 构建命令使用 `pnpm build`。
 
 ### Vercel 订阅自动更新
 
-仓库内的 `vercel.json` 会配置 Vercel Cron，每 6 小时调用一次：
+仓库内的 `vercel.json` 会配置 Vercel Cron，每天调用一次：
 
 ```txt
 /api/internal/refresh-subscriptions
@@ -75,6 +75,8 @@ CRON_SECRET=your-cron-secret
 Vercel Cron 调用时会携带 `Authorization: Bearer <CRON_SECRET>`，接口会使用该值鉴权。
 
 如果 `ENABLE_AUTOUPDATE` 不是 `true`，主动定时刷新会保持禁用；订阅客户端访问云端订阅链接时仍会使用现有的懒刷新逻辑。
+
+Vercel Hobby/Free 账户对 Cron 频率有限制，因此默认使用每日一次的计划任务。如果需要每 6 小时刷新一次，需要升级 Vercel 计划，或改用 Docker 部署中的 `subscription-refresher`。
 
 ## 环境变量
 
