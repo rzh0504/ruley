@@ -60,11 +60,16 @@
   --sidebar-ring: var(--color-neutral-400);
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   font-family: var(--font-display);
   background-color: var(--background);
   color: var(--foreground);
   color-scheme: light;
+  overflow-x: clip;
 }
 
 .dark body {
@@ -75,6 +80,12 @@ body {
 *::-webkit-scrollbar {
   width: 6px;
   height: 6px;
+}
+
+*::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 *::-webkit-scrollbar-track {
@@ -101,6 +112,10 @@ body {
 * {
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 transparent;
+}
+
+:where(.overflow-auto, .overflow-y-auto, .overflow-x-auto) {
+  scrollbar-gutter: stable;
 }
 
 .dark * {

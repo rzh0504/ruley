@@ -97,6 +97,8 @@ type ConfigRecord = {
   proxyGroups: ProxyGroupTemplate[];
   rules: RuleItem[];
   parsedNodes?: Record<string, unknown>[] | null;
+  generatedConfig?: string | null;
+  cloudUrl?: string | null;
 };
 
 type AdvancedSettings = {
@@ -706,8 +708,8 @@ export function DashboardWorkspace() {
       );
       setRules(config.rules || []);
       setNodes(config.parsedNodes || []);
-      setGeneratedConfig("");
-      setCloudUrl("");
+      setGeneratedConfig(config.generatedConfig || "");
+      setCloudUrl(config.cloudUrl ? window.location.origin + config.cloudUrl : "");
       setParseErrors([]);
       setParseDiagnostics([]);
       setValidationIssues([]);
@@ -1217,7 +1219,7 @@ export function DashboardWorkspace() {
               </CardHeader>
               <CardContent className="min-h-0 flex-1 flex flex-col gap-3 overflow-hidden">
                 {cloudUrl && (
-                  <div className="flex shrink-0 gap-2 rounded-xl border bg-background p-2">
+                  <div className="flex shrink-0 gap-2">
                     <Input nativeInput readOnly value={cloudUrl} />
                     <Button
                       variant="outline"
