@@ -22,6 +22,6 @@ export async function POST(request: Request) {
 
   const token = await createSessionToken();
   const response = NextResponse.json({ success: true });
-  response.cookies.set(sessionCookieName, token, getSessionCookieOptions());
+  response.cookies.set(sessionCookieName, token, getSessionCookieOptions(request));
   return response;
 }

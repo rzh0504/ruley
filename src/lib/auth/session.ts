@@ -48,10 +48,16 @@ export const requireSession = async () => {
   return session;
 };
 
-export const getSessionCookieOptions = () => ({
+const isSecureRequest = (request: Request) => {
+  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  if (forwardedProto) return forwardedProto === "https";
+  return new URL(request.url).protocol === "https:";
+};
+
+export const getSessionCookieOptions = (request: Request) => ({
   httpOnly: true,
   sameSite: "lax" as const,
-  secure: process.env.NODE_ENV === "production",
+  secure: isSecureRequest(request),
   path: "/",
   maxAge: tokenMaxAge,
 });
