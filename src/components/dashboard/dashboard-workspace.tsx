@@ -80,6 +80,7 @@ import {
   type AdvancedSettings,
   type ProxyGroupPreferences,
 } from "@/lib/preferences";
+import { createId } from "@/lib/utils";
 
 hljs.registerLanguage("yaml", yamlLanguage);
 
@@ -352,7 +353,7 @@ const parseRuleLine = (
   if (!ruleTypes.includes(type)) return null;
   if (type === "MATCH") {
     return {
-      id: crypto.randomUUID(),
+      id: createId(),
       type,
       value: "",
       policy: valueOrPolicy || fallbackPolicy,
@@ -360,7 +361,7 @@ const parseRuleLine = (
   }
   if (!valueOrPolicy) return null;
   return {
-    id: crypto.randomUUID(),
+    id: createId(),
     type,
     value: valueOrPolicy,
     policy: policy || fallbackPolicy,
@@ -784,7 +785,7 @@ export function DashboardWorkspace({
     syncSources([
       ...sources,
       {
-        id: crypto.randomUUID(),
+        id: createId(),
         name: `订阅源 ${nextIndex}`,
         url: "",
         enabled: true,
@@ -1694,7 +1695,7 @@ export function DashboardWorkspace({
                   setRules([
                     ...rules,
                     {
-                      id: crypto.randomUUID(),
+                      id: createId(),
                       type: "DOMAIN-SUFFIX",
                       value: "",
                       policy: policies[0] || "DIRECT",

@@ -34,6 +34,7 @@ import {
   type ProxyGroupType,
   type ProxyGroupTemplate,
 } from "@/lib/config/proxy-templates";
+import { createId } from "@/lib/utils";
 
 type PolicyOption = ProxyGroupPolicyOption;
 
@@ -191,10 +192,10 @@ export function ProxyGroupManager({
   const createCustomGroup = () => {
     const name = customDraft.name.trim();
     if (!name) return;
-    const idBase = normalizeIdPart(name) || crypto.randomUUID();
+    const idBase = normalizeIdPart(name) || createId();
     let id = `custom-${idBase}`;
     if (activeIds.has(id))
-      id = `custom-${idBase}-${crypto.randomUUID().slice(0, 8)}`;
+      id = `custom-${idBase}-${createId().slice(0, 8)}`;
     const customGroup: ProxyGroupTemplate = {
       id,
       icon: customDraft.icon.trim() || "🌐",
