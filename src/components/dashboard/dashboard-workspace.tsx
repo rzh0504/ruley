@@ -1089,18 +1089,19 @@ export function DashboardWorkspace({
   return (
     <AppShell>
       <div className="flex flex-col gap-6">
-        <section className="sticky top-17 z-30 flex flex-col gap-3 rounded-xl border bg-background/95 p-3 backdrop-blur md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-col gap-1">
+        <section className="sticky top-24 z-30 flex flex-col gap-3 rounded-xl border bg-background/95 p-3 backdrop-blur md:top-17 md:flex-row md:items-center md:justify-between">
+          <div className="hidden flex-col gap-1 md:flex">
             <h1 className="text-3xl font-semibold tracking-tight">
               配置工作台
             </h1>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={generate} loading={isPending}>
+          <div className="grid w-full grid-cols-3 gap-2 md:flex md:w-auto md:flex-wrap">
+            <Button className="min-w-0 gap-1 px-1 text-xs md:gap-2 md:px-[calc(--spacing(3)-1px)] md:text-sm" onClick={generate} loading={isPending}>
               <PlayIcon aria-hidden="true" />
               生成 YAML
             </Button>
             <Button
+              className="min-w-0 gap-1 px-1 text-xs md:gap-2 md:px-[calc(--spacing(3)-1px)] md:text-sm"
               variant="secondary"
               onClick={() => saveCloud()}
               loading={isPending}
@@ -1109,6 +1110,7 @@ export function DashboardWorkspace({
               {pendingBranchParentId ? "托管分支" : currentConfigId ? "更新托管" : "保存托管"}
             </Button>
             <Button
+              className="min-w-0 gap-1 px-1 text-xs md:gap-2 md:px-[calc(--spacing(3)-1px)] md:text-sm"
               variant="outline"
               onClick={createBranchDraft}
               disabled={!currentConfigId || Boolean(pendingBranchParentId)}

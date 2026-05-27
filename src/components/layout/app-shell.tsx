@@ -66,12 +66,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh bg-[linear-gradient(180deg,var(--background),var(--muted))] dark:bg-background">
       <header className="sticky top-0 z-40 border-b bg-background/88 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 lg:px-6">
-          <Link href={dashboardHref} className="flex items-center gap-3">
-            <img src="/ruley.svg" alt="" className="size-9 -translate-y-0.5 dark:invert" />
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 py-2 md:gap-4 md:py-3 lg:px-6">
+          <Link href={dashboardHref} className="flex min-w-0 items-center gap-2 md:gap-3">
+            <img src="/ruley.svg" alt="" className="size-8 -translate-y-0.5 shrink-0 dark:invert md:size-9" />
             <div className="flex flex-col leading-tight">
               <span className="font-semibold">Ruley</span>
-              <span className="text-muted-foreground text-xs">Mihomo config workspace</span>
+              <span className="text-muted-foreground hidden text-xs md:block">Mihomo config workspace</span>
             </div>
           </Link>
           <nav className="hidden items-center gap-2 md:flex">
@@ -110,7 +110,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Button>
           </div>
         </div>
-        <nav className="mx-auto flex max-w-7xl gap-2 px-4 pb-3 md:hidden">
+        <nav className="mx-auto flex max-w-7xl gap-2 px-4 pb-2 md:hidden">
           {navItems.map((item) => {
             const Icon = item.icon;
             const href = item.href === "/dashboard" ? dashboardHref : item.href;
